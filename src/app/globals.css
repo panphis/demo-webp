@@ -1,26 +1,82 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-button-primary-background: var(--color-button-primary-background);
+  --color-button-primary-background-hover: var(--color-button-primary-background-hover);
+  --color-button-primary-foreground: var(--color-button-primary-foreground);
+  --color-button-primary-foreground-hover: var(--color-button-primary-foreground-hover);
+
+  --color-button-ghost-background: var(--color-button-ghost-background);
+  --color-button-ghost-background-hover: var(--color-button-ghost-background-hover);
+  --color-button-ghost-background-selected: var(--color-button-ghost-background-selected);
+
+  --color-icon-primary: var(--color-icon-primary);
+  --color-icon-primary-hover: var(--color-icon-primary-hover);
+  --color-icon-primary-disabled: var(--color-icon-primary-disabled);
+
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
+  --color-conversation-background-current: var(--color-conversation-background-current);
+  --color-conversation-background-previous: var(--color-conversation-background-previous);
+  --color-user: var(--color-user);
+  --color-original-text: var(--color-original-text);
+  --color-translated-text: var(--color-translated-text);
+  --color-primary: var(--color-primary);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: #183443;
+  --foreground: rgba(255, 255, 255, 1);
+  --color-primary: rgba(53, 84, 118, 1);
+  --color-button-primary-background: rgba(47, 85, 111, 0.6);
+  --color-button-primary-background-hover: rgba(133, 173, 200, 0.4);
+  --color-button-primary-foreground: rgba(255, 255, 255, 1);
+  --color-button-primary-foreground-hover: rgba(255, 255, 255, 1);
+  --color-button-shadow: rgba(87, 139, 169, 0.5);
+  --color-button-shadow-hover: rgba(189, 231, 255, 0.5);
+
+  --color-button-ghost-background: rgba(17, 40, 52, 0);
+  --color-button-ghost-background-hover: rgba(29, 65, 84, 1);
+  --color-button-ghost-background-selected: rgba(17, 40, 52, 1);
+
+  --color-icon-primary: rgba(60, 94, 131, 1);
+  --color-icon-primary-hover: rgba(131, 178, 227, 1);
+  --color-icon-primary-disabled: rgba(165, 165, 165, 1);
+
+  --color-conversation-background-current: #ddf2fd;
+  --color-conversation-background-previous: #b3d8ee;
+  --color-user: rgba(60, 94, 131, 1);
+  --color-original-text: rgba(63, 63, 63, 1);
+  --color-translated-text: rgba(53, 84, 118, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .button-inset-shadow {
+    box-shadow:
+      1px 1px 1px 0px var(--color-button-shadow) inset,
+      -1px -1px 1px 0px var(--color-button-shadow) inset;
+  }
+  .button-inset-shadow-hover {
+    box-shadow:
+      1px 1px 1px 0px var(--color-button-shadow-hover) inset,
+      -1px -1px 1px 0px var(--color-button-shadow-hover) inset;
+  }
 }
