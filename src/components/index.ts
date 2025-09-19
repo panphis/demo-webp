@@ -1,2 +1,1 @@
- 
-export { LoadingButton, Wait } from './animation';
+export * from "./animation";
