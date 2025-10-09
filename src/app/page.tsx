@@ -1,14 +1,16 @@
 
-import { LoadingButton, Wait } from "@/components";
+import { PixiWait, LoadingButton } from "@/components";
+
+
 
 export default function Home() {
   return (
     <main>
       <div className="flex flex-col gap-2 w-full">
         <div className="relative bottom-[-100px]">
-          <Wait />
+          <PixiWait  className="w-100 h-100"/>
         </div>
-        <div className="flex flex-row gap-2 w-full py-4">
+        <div className="flex flex-row gap-2 w-full py-4 z-10">
           <LoadingButton
             variant="default"
             size="icon"

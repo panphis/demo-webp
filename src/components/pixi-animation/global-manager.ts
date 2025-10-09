@@ -4,7 +4,7 @@
  */
 
 import * as PIXI from "pixi.js";
-import imgSrc from "../animation/wait-122-15000x15000-1000x1000.webp";
+import imgSrc from "./wait-122-15000x15000-1000x1000.webp";
 
 class SimpleGlobalPixiManager {
   private static instance: SimpleGlobalPixiManager;
@@ -13,6 +13,9 @@ class SimpleGlobalPixiManager {
   private currentContainer: HTMLDivElement | null = null;
   private isInitializing = false;
   private activeContainers = new Set<HTMLDivElement>();
+  private initPromise: Promise<boolean> | null = null;
+  private eventTarget = new EventTarget();
+
 
   private constructor() {}
 
@@ -29,20 +32,12 @@ class SimpleGlobalPixiManager {
       return true;
     }
 
-    // If currently initializing, wait for completion
-    if (this.isInitializing) {
-      return new Promise(resolve => {
-        const checkInit = () => {
-          if (!this.isInitializing) {
-            this.activeContainers.add(container);
-            this.moveToContainer(container);
-            resolve(true);
-          } else {
-            setTimeout(checkInit, 50);
-          }
-        };
-        checkInit();
-      });
+    // If currently initializing, wait for completion using existing promise
+    if (this.isInitializing && this.initPromise) {
+      await this.initPromise;
+      this.activeContainers.add(container);
+      this.moveToContainer(container);
+      return true;
     }
 
     // If already initialized, move to new container directly
@@ -55,7 +50,12 @@ class SimpleGlobalPixiManager {
     // Start initialization
     this.isInitializing = true;
     this.activeContainers.add(container);
+    this.initPromise = this.initializePixiApp(container);
 
+    return this.initPromise!;
+  }
+
+  private async initializePixiApp(container: HTMLDivElement): Promise<boolean> {
     try {
       // Create PixiJS application
       this.app = new PIXI.Application();
@@ -68,8 +68,8 @@ class SimpleGlobalPixiManager {
         autoDensity: true,
       });
 
-      // Wait for application to fully initialize
-      await new Promise(resolve => requestAnimationFrame(resolve));
+      // Wait for application to fully initialize using requestAnimationFrame
+      await this.waitForNextFrame();
 
       // Load animation resources
       const texture = await PIXI.Assets.load(imgSrc.src);
@@ -113,8 +113,9 @@ class SimpleGlobalPixiManager {
           // console.log("onFrameChange complete");
         }
       };
+      
       // Wait for next frame to ensure objects are fully initialized
-      await new Promise(resolve => requestAnimationFrame(resolve));
+      await this.waitForNextFrame();
 
       if (!this.app || !this.app.renderer || !this.animatedSprite) {
         throw new Error("PixiJS objects not properly initialized");
@@ -135,7 +136,7 @@ class SimpleGlobalPixiManager {
       this.app.stage.addChild(this.animatedSprite);
 
       // Wait for next frame to ensure animated sprite is fully added to scene
-      await new Promise(resolve => requestAnimationFrame(resolve));
+      await this.waitForNextFrame();
 
       // Frame watcher
       const frameWatcher = () => {
@@ -183,14 +184,21 @@ class SimpleGlobalPixiManager {
       this.moveToContainer(container);
 
       this.isInitializing = false;
+      this.initPromise = null;
+      this.eventTarget.dispatchEvent(new CustomEvent('initialized'));
       return true;
     } catch (error) {
       console.error("[SimpleGlobalPixiManager] Initialization failed:", error);
       this.isInitializing = false;
+      this.initPromise = null;
       this.activeContainers.delete(container);
       this.cleanup();
       throw error;
     }
+  }
+
+  private async waitForNextFrame(): Promise<void> {
+    return new Promise(resolve => requestAnimationFrame(() => resolve()));
   }
 
   moveToContainer(container: HTMLDivElement): void {
@@ -244,13 +252,9 @@ class SimpleGlobalPixiManager {
   unregisterContainer(container: HTMLDivElement): void {
     this.activeContainers.delete(container);
 
-    // If no active containers, cleanup resources
+    // If no active containers, cleanup resources immediately
     if (this.activeContainers.size === 0) {
-      setTimeout(() => {
-        if (this.activeContainers.size === 0) {
-          this.cleanup();
-        }
-      }, 100);
+      this.cleanup();
     }
   }
 

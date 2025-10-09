@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import imgSrc from "../animation/wait-122-15000x15000-1000x1000.webp";
+import imgSrc from "./wait-122-15000x15000-1000x1000.webp";
 import { PixiAnimation } from "./";
 
 type Props = {
