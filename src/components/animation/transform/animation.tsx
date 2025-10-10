@@ -159,6 +159,7 @@ export const Animation: FC<Props & Config> = ({
       const translateY = -row * scaledSpriteSize.cellHeight;
       transforms.push(`translate(${translateX}px, ${translateY}px)`);
     }
+    console.log(transforms);
     return transforms;
   }, [
     count,

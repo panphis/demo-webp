@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <style>
+    .container {
+      width: 500px;
+      height: 500px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sprite {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 7500px;
+      height: 7500px;
+      background-image: url(./wait-122-15000x15000-1000x1000.webp);
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      backface-visibility: hidden;
+      will-change: transform;
+      transform-style: preserve-3d;
+    }
+  </style>
+  <body>
+    <div class="container">
+      <div class="sprite"></div>
+    </div>
+
+    <p class="count" id="count">0</p>
+
+    <script>
+      const count = document.getElementById("count");
+      let index = 0;
+      const sprite = document.querySelector(".sprite");
+
+      const transforms = [
+        "translate(0px, 0px)",
+        "translate(-500px, 0px)",
+        "translate(-1000px, 0px)",
+        "translate(-1500px, 0px)",
+        "translate(-2000px, 0px)",
+        "translate(-2500px, 0px)",
+        "translate(-3000px, 0px)",
+        "translate(-3500px, 0px)",
+        "translate(-4000px, 0px)",
+        "translate(-4500px, 0px)",
+        "translate(-5000px, 0px)",
+        "translate(-5500px, 0px)",
+        "translate(-6000px, 0px)",
+        "translate(-6500px, 0px)",
+        "translate(-7000px, 0px)",
+        "translate(0px, -500px)",
+        "translate(-500px, -500px)",
+        "translate(-1000px, -500px)",
+        "translate(-1500px, -500px)",
+        "translate(-2000px, -500px)",
+        "translate(-2500px, -500px)",
+        "translate(-3000px, -500px)",
+        "translate(-3500px, -500px)",
+        "translate(-4000px, -500px)",
+        "translate(-4500px, -500px)",
+        "translate(-5000px, -500px)",
+        "translate(-5500px, -500px)",
+        "translate(-6000px, -500px)",
+        "translate(-6500px, -500px)",
+        "translate(-7000px, -500px)",
+        "translate(0px, -1000px)",
+        "translate(-500px, -1000px)",
+        "translate(-1000px, -1000px)",
+        "translate(-1500px, -1000px)",
+        "translate(-2000px, -1000px)",
+        "translate(-2500px, -1000px)",
+        "translate(-3000px, -1000px)",
+        "translate(-3500px, -1000px)",
+        "translate(-4000px, -1000px)",
+        "translate(-4500px, -1000px)",
+        "translate(-5000px, -1000px)",
+        "translate(-5500px, -1000px)",
+        "translate(-6000px, -1000px)",
+        "translate(-6500px, -1000px)",
+        "translate(-7000px, -1000px)",
+        "translate(0px, -1500px)",
+        "translate(-500px, -1500px)",
+        "translate(-1000px, -1500px)",
+        "translate(-1500px, -1500px)",
+        "translate(-2000px, -1500px)",
+        "translate(-2500px, -1500px)",
+        "translate(-3000px, -1500px)",
+        "translate(-3500px, -1500px)",
+        "translate(-4000px, -1500px)",
+        "translate(-4500px, -1500px)",
+        "translate(-5000px, -1500px)",
+        "translate(-5500px, -1500px)",
+        "translate(-6000px, -1500px)",
+        "translate(-6500px, -1500px)",
+        "translate(-7000px, -1500px)",
+        "translate(0px, -2000px)",
+        "translate(-500px, -2000px)",
+        "translate(-1000px, -2000px)",
+        "translate(-1500px, -2000px)",
+        "translate(-2000px, -2000px)",
+        "translate(-2500px, -2000px)",
+        "translate(-3000px, -2000px)",
+        "translate(-3500px, -2000px)",
+        "translate(-4000px, -2000px)",
+        "translate(-4500px, -2000px)",
+        "translate(-5000px, -2000px)",
+        "translate(-5500px, -2000px)",
+        "translate(-6000px, -2000px)",
+        "translate(-6500px, -2000px)",
+        "translate(-7000px, -2000px)",
+        "translate(0px, -2500px)",
+        "translate(-500px, -2500px)",
+        "translate(-1000px, -2500px)",
+        "translate(-1500px, -2500px)",
+        "translate(-2000px, -2500px)",
+        "translate(-2500px, -2500px)",
+        "translate(-3000px, -2500px)",
+        "translate(-3500px, -2500px)",
+        "translate(-4000px, -2500px)",
+        "translate(-4500px, -2500px)",
+        "translate(-5000px, -2500px)",
+        "translate(-5500px, -2500px)",
+        "translate(-6000px, -2500px)",
+        "translate(-6500px, -2500px)",
+        "translate(-7000px, -2500px)",
+        "translate(0px, -3000px)",
+        "translate(-500px, -3000px)",
+        "translate(-1000px, -3000px)",
+        "translate(-1500px, -3000px)",
+        "translate(-2000px, -3000px)",
+        "translate(-2500px, -3000px)",
+        "translate(-3000px, -3000px)",
+        "translate(-3500px, -3000px)",
+        "translate(-4000px, -3000px)",
+        "translate(-4500px, -3000px)",
+        "translate(-5000px, -3000px)",
+        "translate(-5500px, -3000px)",
+        "translate(-6000px, -3000px)",
+        "translate(-6500px, -3000px)",
+        "translate(-7000px, -3000px)",
+        "translate(0px, -3500px)",
+        "translate(-500px, -3500px)",
+        "translate(-1000px, -3500px)",
+        "translate(-1500px, -3500px)",
+        "translate(-2000px, -3500px)",
+        "translate(-2500px, -3500px)",
+        "translate(-3000px, -3500px)",
+        "translate(-3500px, -3500px)",
+        "translate(-4000px, -3500px)",
+        "translate(-4500px, -3500px)",
+        "translate(-5000px, -3500px)",
+        "translate(-5500px, -3500px)",
+        "translate(-6000px, -3500px)",
+        "translate(-6500px, -3500px)",
+        "translate(-7000px, -3500px)",
+        "translate(0px, -4000px)",
+        "translate(-500px, -4000px)",
+      ];
+      let frame = 0;
+      const total = transforms.length;
+      setInterval(() => {
+        sprite.style.transform = transforms[frame];
+        frame++;
+        if (frame >= total) {
+          frame = 0;
+        }
+      }, 17);
+
+      setInterval(() => {
+        index++;
+        count.innerHTML = index;
+      }, 100);
+    </script>
+  </body>
+</html>

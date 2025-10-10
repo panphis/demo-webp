@@ -1,7 +1,7 @@
 "use client";
 
 import { Config } from "@/types";
-import { useMemo } from "react";
+import { useMemo, useId } from "react";
 
 type Props = {
   // 动画持续时间（秒）
@@ -11,6 +11,8 @@ type Props = {
   // 容器高度（可选，默认使用单元格高度）
   containerHeight?: number;
 };
+
+const animationNamePrefix = "animation";
 
 export const Animation: React.FC<Props & Config> = ({
   width,
@@ -39,10 +41,7 @@ export const Animation: React.FC<Props & Config> = ({
     return { cols, rows };
   }, [width, cellWidth, count]);
 
-  // 创建唯一的动画名称
-  const animationName = useMemo(() => {
-    return `sprite-animation-${Math.random().toString(36).substr(2, 9)}`;
-  }, []);
+  const id = useId();
 
   // 计算精灵图的缩放比例和背景尺寸
   const backgroundSize = useMemo(() => {
@@ -83,18 +82,18 @@ export const Animation: React.FC<Props & Config> = ({
     `;
     console.log(keyframeRules);
     return `
-      @keyframes ${animationName} {
+        @keyframes ${animationNamePrefix}-${id} {
         ${keyframeRules}
       }
     `;
-  }, [animationName, count, layoutInfo.cols, containerDimensions]);
+  }, [id, count, layoutInfo.cols, containerDimensions]);
 
   // 动画CSS属性 - 使用 steps() 确保精确的帧切换
   const animationStyle = useMemo(() => {
     return {
-      animation: `${animationName} ${duration}s steps(1) infinite`,
+      animation: `${animationNamePrefix}-${id} ${duration}s steps(1) infinite`,
     };
-  }, [animationName, duration]);
+  }, [id, duration]);
 
   return (
     <>

@@ -8,3 +8,9 @@ export type Config = {
   containerWidth?: number;
   containerHeight?: number;
 };
+
+export type GroupedItems = {
+  id: string;
+  userInfo: any;
+  assistantInfo: any;
+};
