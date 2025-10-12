@@ -1,0 +1,11 @@
+export { ArrowUp } from "./arrow-up";
+export { Close } from "./close";
+export { Edit } from "./edit";
+export { Keyboard } from "./keyboard";
+export { Language } from "./language";
+export { Listening } from "./listening";
+export { IconLogo } from "./logo";
+export { IconMenu } from "./menu";
+export { Play } from "./play";
+export { Plus } from "./plus";
+export { Send } from "./send";
