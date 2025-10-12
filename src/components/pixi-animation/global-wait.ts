@@ -20,6 +20,8 @@ class SimpleGlobalWaitPixiManager {
   private currentContainer: HTMLDivElement | null = null;
   private isInitializing = false;
   private activeContainers = new Set<HTMLDivElement>();
+  private initializationPromise: Promise<boolean> | null = null;
+  private initializationResolvers: Array<(value: boolean) => void> = [];
 
   private constructor() {}
 
@@ -35,22 +37,13 @@ class SimpleGlobalWaitPixiManager {
     if (this.activeContainers.has(container)) {
       return true;
     }
-    
 
-    // If currently initializing, wait for completion
-    if (this.isInitializing) {
-      return new Promise(resolve => {
-        const checkInit = () => {
-          if (!this.isInitializing) {
-            this.activeContainers.add(container);
-            this.moveToContainer(container);
-            resolve(true);
-          } else {
-            setTimeout(checkInit, 50);
-          }
-        };
-        checkInit();
-      });
+    // If currently initializing, wait for completion using Promise
+    if (this.isInitializing && this.initializationPromise) {
+      await this.initializationPromise;
+      this.activeContainers.add(container);
+      this.moveToContainer(container);
+      return true;
     }
 
     // If already initialized, move to new container directly
@@ -63,6 +56,11 @@ class SimpleGlobalWaitPixiManager {
     // Start initialization
     this.isInitializing = true;
     this.activeContainers.add(container);
+    
+    // Create initialization promise
+    this.initializationPromise = new Promise<boolean>((resolve) => {
+      this.initializationResolvers.push(resolve);
+    });
 
     const { width, height, cellWidth, cellHeight, count, imgSrc } = config;
 
@@ -79,7 +77,11 @@ class SimpleGlobalWaitPixiManager {
       });
 
       // Load animation resources
+      const label = "load texture";
+      console.time(label);
       const texture = await PIXI.Assets.load(imgSrc);
+      console.timeEnd(label);
+      console.log('texture', texture);
 
       if (texture.source && "scaleMode" in texture.source) {
         texture.source.scaleMode = "nearest";
@@ -184,12 +186,23 @@ class SimpleGlobalWaitPixiManager {
       // Move to container
       this.moveToContainer(container);
 
+      // Resolve all waiting promises
       this.isInitializing = false;
+      this.initializationResolvers.forEach(resolve => resolve(true));
+      this.initializationResolvers = [];
+      this.initializationPromise = null;
+      
       return true;
     } catch (error) {
       console.error("[SimpleGlobalPixiManager] Initialization failed:", error);
       this.isInitializing = false;
       this.activeContainers.delete(container);
+      
+      // Reject all waiting promises
+      this.initializationResolvers.forEach(resolve => resolve(false));
+      this.initializationResolvers = [];
+      this.initializationPromise = null;
+      
       this.cleanup();
       throw error;
     }
