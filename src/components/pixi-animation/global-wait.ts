@@ -4,40 +4,53 @@
  */
 
 import * as PIXI from "pixi.js";
-import imgSrc from "./wait-122-15000x15000-1000x1000.webp";
 
-class SimpleGlobalPixiManager {
-  private static instance: SimpleGlobalPixiManager;
+type Config = {
+  width: number;
+  height: number;
+  cellWidth: number;
+  cellHeight: number;
+  count: number;
+  imgSrc: string;
+};
+class SimpleGlobalWaitPixiManager {
+  private static instance: SimpleGlobalWaitPixiManager;
   private app: PIXI.Application | null = null;
   private animatedSprite: PIXI.AnimatedSprite | null = null;
   private currentContainer: HTMLDivElement | null = null;
   private isInitializing = false;
   private activeContainers = new Set<HTMLDivElement>();
-  private initPromise: Promise<boolean> | null = null;
-  private eventTarget = new EventTarget();
-
 
   private constructor() {}
 
-  static getInstance(): SimpleGlobalPixiManager {
-    if (!SimpleGlobalPixiManager.instance) {
-      SimpleGlobalPixiManager.instance = new SimpleGlobalPixiManager();
+  static getInstance(): SimpleGlobalWaitPixiManager {
+    if (!SimpleGlobalWaitPixiManager.instance) {
+      SimpleGlobalWaitPixiManager.instance = new SimpleGlobalWaitPixiManager();
     }
-    return SimpleGlobalPixiManager.instance;
+    return SimpleGlobalWaitPixiManager.instance;
   }
 
-  async getOrCreateAnimation(container: HTMLDivElement): Promise<boolean> {
+  async getOrCreateAnimation(container: HTMLDivElement, config: Config): Promise<boolean> {
     // If container is already registered, return success directly
     if (this.activeContainers.has(container)) {
       return true;
     }
+    
 
-    // If currently initializing, wait for completion using existing promise
-    if (this.isInitializing && this.initPromise) {
-      await this.initPromise;
-      this.activeContainers.add(container);
-      this.moveToContainer(container);
-      return true;
+    // If currently initializing, wait for completion
+    if (this.isInitializing) {
+      return new Promise(resolve => {
+        const checkInit = () => {
+          if (!this.isInitializing) {
+            this.activeContainers.add(container);
+            this.moveToContainer(container);
+            resolve(true);
+          } else {
+            setTimeout(checkInit, 50);
+          }
+        };
+        checkInit();
+      });
     }
 
     // If already initialized, move to new container directly
@@ -50,39 +63,33 @@ class SimpleGlobalPixiManager {
     // Start initialization
     this.isInitializing = true;
     this.activeContainers.add(container);
-    this.initPromise = this.initializePixiApp(container);
 
-    return this.initPromise!;
-  }
+    const { width, height, cellWidth, cellHeight, count, imgSrc } = config;
 
-  private async initializePixiApp(container: HTMLDivElement): Promise<boolean> {
     try {
       // Create PixiJS application
       this.app = new PIXI.Application();
       await this.app.init({
-        width: 1000,
-        height: 1000,
+        width: cellWidth,
+        height: cellHeight,
         backgroundAlpha: 0,
         antialias: true,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
       });
 
-      // Wait for application to fully initialize using requestAnimationFrame
-      await this.waitForNextFrame();
-
       // Load animation resources
-      const texture = await PIXI.Assets.load(imgSrc.src);
+      const texture = await PIXI.Assets.load(imgSrc);
 
       if (texture.source && "scaleMode" in texture.source) {
         texture.source.scaleMode = "nearest";
       }
 
       // Calculate grid layout
-      const frameWidth = 1000;
-      const frameHeight = 1000;
-      const totalFrames = 122;
-      const sheetWidth = texture.source?.width ?? 15000;
+      const frameWidth = cellWidth;
+      const frameHeight = cellHeight;
+      const totalFrames = count;
+      const sheetWidth = texture.source?.width ?? width;
       const cols = Math.max(1, Math.floor(sheetWidth / frameWidth));
 
       // Generate frame textures
@@ -113,9 +120,6 @@ class SimpleGlobalPixiManager {
           // console.log("onFrameChange complete");
         }
       };
-      
-      // Wait for next frame to ensure objects are fully initialized
-      await this.waitForNextFrame();
 
       if (!this.app || !this.app.renderer || !this.animatedSprite) {
         throw new Error("PixiJS objects not properly initialized");
@@ -134,9 +138,6 @@ class SimpleGlobalPixiManager {
       // this.animatedSprite.gotoAndStop(0);
 
       this.app.stage.addChild(this.animatedSprite);
-
-      // Wait for next frame to ensure animated sprite is fully added to scene
-      await this.waitForNextFrame();
 
       // Frame watcher
       const frameWatcher = () => {
@@ -184,21 +185,14 @@ class SimpleGlobalPixiManager {
       this.moveToContainer(container);
 
       this.isInitializing = false;
-      this.initPromise = null;
-      this.eventTarget.dispatchEvent(new CustomEvent('initialized'));
       return true;
     } catch (error) {
       console.error("[SimpleGlobalPixiManager] Initialization failed:", error);
       this.isInitializing = false;
-      this.initPromise = null;
       this.activeContainers.delete(container);
       this.cleanup();
       throw error;
     }
-  }
-
-  private async waitForNextFrame(): Promise<void> {
-    return new Promise(resolve => requestAnimationFrame(() => resolve()));
   }
 
   moveToContainer(container: HTMLDivElement): void {
@@ -252,9 +246,13 @@ class SimpleGlobalPixiManager {
   unregisterContainer(container: HTMLDivElement): void {
     this.activeContainers.delete(container);
 
-    // If no active containers, cleanup resources immediately
+    // If no active containers, cleanup resources
     if (this.activeContainers.size === 0) {
-      this.cleanup();
+      setTimeout(() => {
+        if (this.activeContainers.size === 0) {
+          this.cleanup();
+        }
+      }, 100);
     }
   }
 
@@ -287,4 +285,4 @@ class SimpleGlobalPixiManager {
   }
 }
 
-export const simpleGlobalPixiManager = SimpleGlobalPixiManager.getInstance();
+export const simpleGlobalPixiManager = SimpleGlobalWaitPixiManager.getInstance();

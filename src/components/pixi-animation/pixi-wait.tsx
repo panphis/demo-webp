@@ -16,7 +16,6 @@ export const PixiWait: FC<Props> = ({ className }) => {
       count={122}
       imgSrc={imgSrc.src}
       loop={true}
-      duration={5.08} // 122 frames at 48fps = ~2.54 seconds
       className={className}
     />
   );

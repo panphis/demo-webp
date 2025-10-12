@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
-import { simpleGlobalPixiManager } from "./global-manager";
+import { simpleGlobalPixiManager } from "./global-wait";
 
 type Props = {
   width: number;
@@ -11,20 +11,19 @@ type Props = {
   cellHeight: number;
   count: number;
   imgSrc: string;
-  loop: boolean;
-  duration?: number;
+  loop: boolean; 
   className?: string;
 };
 
 export const PixiAnimation = forwardRef<unknown, Props>(
   (
     {
-      width: _width,
-      cellWidth: _cellWidth,
-      cellHeight: _cellHeight,
-      count: _count,
-      imgSrc: _imgSrc,
-      duration: _duration = 2,
+      width,
+      height,
+      cellWidth,
+      cellHeight,
+      count,
+      imgSrc,
       className,
     },
     ref
@@ -49,7 +48,14 @@ export const PixiAnimation = forwardRef<unknown, Props>(
         try {
           setStatus("Loading...");
           if (canvasMountRef.current) {
-            await simpleGlobalPixiManager.getOrCreateAnimation(canvasMountRef.current);
+            await simpleGlobalPixiManager.getOrCreateAnimation(canvasMountRef.current, {
+              width,
+              height,
+              cellWidth,
+              cellHeight,
+              count,
+              imgSrc
+            });
           }
           setStatus("Ready");
         } catch (error) {
