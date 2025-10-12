@@ -1,4 +1,3 @@
-export { WaitAnimation } from "./animation/wait";
 export { WaitTransform } from "./transform";
 export { AnimationWrapper } from "./animation-wrapper";
 export { LottieAnimation } from "./lottie";
