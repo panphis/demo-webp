@@ -7,6 +7,7 @@ import { AnimationMainState, AnimationState } from "../../types/animation";
 
 type Props = {
   className?: string;
+  targetState?: AnimationMainState; // 外部控制的目标状态
   onStateChange?: (state: AnimationState) => void;
   onAnimationComplete?: (state: AnimationState) => void;
 };
@@ -19,7 +20,7 @@ export interface SequenceAnimationRef {
 }
 
 export const SequenceAnimation = forwardRef<SequenceAnimationRef, Props>(
-  ({ className, onStateChange, onAnimationComplete }, ref) => {
+  ({ className, targetState, onStateChange, onAnimationComplete }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasMountRef = useRef<HTMLDivElement>(null);
     const [status, setStatus] = useState("Loading...");
@@ -88,6 +89,13 @@ export const SequenceAnimation = forwardRef<SequenceAnimationRef, Props>(
         animationSequenceManager.removeCallbacks();
       };
     }, [onStateChange, onAnimationComplete]);
+
+    // 监听外部状态变化
+    useEffect(() => {
+      if (targetState !== undefined) {
+        animationSequenceManager.setTargetState(targetState);
+      }
+    }, [targetState]);
 
     return (
       <div ref={containerRef} className={cn(className, "overflow-hidden z-0")}>

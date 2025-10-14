@@ -10,6 +10,7 @@ export default function SequenceAnimationPage() {
     main: AnimationMainState.INIT,
     sub: "start" as any
   });
+  const [targetState, setTargetState] = useState<AnimationMainState>(AnimationMainState.INIT);
 
   const handleStateChange = (state: AnimationState) => {
     setCurrentState(state);
@@ -21,15 +22,15 @@ export default function SequenceAnimationPage() {
   };
 
   const changeToListen = () => {
-    animationRef.current?.setTargetState(AnimationMainState.LISTEN);
+    setTargetState(AnimationMainState.LISTEN);
   };
 
   const changeToTranslate = () => {
-    animationRef.current?.setTargetState(AnimationMainState.TRANSLATE);
+    setTargetState(AnimationMainState.TRANSLATE);
   };
 
   const changeToInit = () => {
-    animationRef.current?.setTargetState(AnimationMainState.INIT);
+    setTargetState(AnimationMainState.INIT);
   };
 
   const play = () => {
@@ -48,6 +49,7 @@ export default function SequenceAnimationPage() {
           <div className="h-96 w-full">
             <SequenceAnimation
               ref={animationRef}
+              targetState={targetState}
               onStateChange={handleStateChange}
               onAnimationComplete={handleAnimationComplete}
               className="w-full h-full"

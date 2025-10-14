@@ -15,6 +15,7 @@ import {
   mapMainStateToInternal
 } from '../../types/animation';
 import { animationResources } from './animation-resources';
+import { resourceCacheManager } from './resource-cache';
 
 class AnimationSequenceManager {
   private static instance: AnimationSequenceManager;
@@ -59,7 +60,25 @@ class AnimationSequenceManager {
    */
   setTargetState(mainState: AnimationMainState): void {
     this.targetMainState = mainState;
-    this.checkAndTransition();
+    
+    // 只有在应用已初始化时才进行状态转换
+    if (this.app && this.app.renderer) {
+      this.checkAndTransition();
+    }
+  }
+
+  /**
+   * 预加载所有资源
+   */
+  async preloadResources(): Promise<void> {
+    return resourceCacheManager.preloadAllResources();
+  }
+
+  /**
+   * 获取资源加载状态
+   */
+  getResourceStats() {
+    return resourceCacheManager.getCacheStats();
   }
 
   /**
@@ -141,6 +160,9 @@ class AnimationSequenceManager {
       this.initializationResolvers = [];
       this.initializationPromise = null;
       
+      // 初始化完成后，检查是否需要状态转换
+      this.checkAndTransition();
+      
       return true;
     } catch (error) {
       console.error("[AnimationSequenceManager] Initialization failed:", error);
@@ -160,71 +182,49 @@ class AnimationSequenceManager {
    * 加载指定状态的动画
    */
   private async loadAnimation(state: AnimationState): Promise<void> {
-    if (!this.app) {
+    if (!this.app || !this.app.renderer) {
       throw new Error("PIXI Application not initialized");
     }
 
     // 将主状态映射到内部状态
     const internalState = mapMainStateToInternal(state.main);
-    const config = animationResources[internalState][state.sub];
+    
+    // 从缓存获取资源
+    const cachedResource = await resourceCacheManager.getResource(internalState, state.sub);
+    const { texture, frames, config } = cachedResource;
     this.currentConfig = config;
 
-    // 加载纹理
-    const texture = await PIXI.Assets.load(config.imgSrc);
-    
-    if (texture.source && "scaleMode" in texture.source) {
-      texture.source.scaleMode = "nearest";
-    }
-
-    // 计算帧布局
-    const frameWidth = config.cellWidth;
-    const frameHeight = config.cellHeight;
-    const totalFrames = config.count;
-    const sheetWidth = texture.source?.width ?? config.width;
-    const cols = Math.max(1, Math.floor(sheetWidth / frameWidth));
-
-    // 生成帧纹理
-    const safe = 1;
-    const frames = Array.from({ length: totalFrames }, (_, i) => {
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-      const x = col * frameWidth + safe;
-      const y = row * frameHeight + safe;
-      const w = frameWidth - safe * 2;
-      const h = frameHeight - safe * 2;
-      return new PIXI.Texture({
-        source: texture.source,
-        frame: new PIXI.Rectangle(x, y, w, h),
-      });
+    // 创建新的动画精灵
+    const newAnimatedSprite = new PIXI.AnimatedSprite({
+      textures: frames,
+      autoUpdate: false,
     });
 
-    // 移除旧的动画精灵
+    newAnimatedSprite.anchor.set(0.5);
+    newAnimatedSprite.position.set(this.app.renderer.width / 2, this.app.renderer.height / 2);
+
+    // 设置缩放
+    const scale = Math.min(this.app.renderer.width / config.cellWidth, this.app.renderer.height / config.cellHeight);
+    newAnimatedSprite.scale.set(scale);
+
+    // 配置动画
+    newAnimatedSprite.animationSpeed = 1;
+    newAnimatedSprite.loop = false; // 不自动循环，由我们控制
+
+    // 先添加新的动画精灵
+    this.app.stage.addChild(newAnimatedSprite);
+
+    // 然后移除旧的动画精灵
     if (this.animatedSprite) {
       this.app.stage.removeChild(this.animatedSprite);
       this.animatedSprite.destroy();
     }
 
-    // 创建新的动画精灵
-    this.animatedSprite = new PIXI.AnimatedSprite({
-      textures: frames,
-      autoUpdate: false,
-    });
-
-    this.animatedSprite.anchor.set(0.5);
-    this.animatedSprite.position.set(this.app.renderer.width / 2, this.app.renderer.height / 2);
-
-    // 设置缩放
-    const scale = Math.min(this.app.renderer.width / frameWidth, this.app.renderer.height / frameHeight);
-    this.animatedSprite.scale.set(scale);
-
-    // 配置动画
-    this.animatedSprite.animationSpeed = 1;
-    this.animatedSprite.loop = false; // 不自动循环，由我们控制
-
-    this.app.stage.addChild(this.animatedSprite);
+    // 更新引用
+    this.animatedSprite = newAnimatedSprite;
 
     // 设置帧数
-    this.frameCount = totalFrames;
+    this.frameCount = frames.length;
     this.currentFrame = 0;
 
     // 开始播放
@@ -384,6 +384,12 @@ class AnimationSequenceManager {
       this.stateChangeCallbacks.forEach(callback => {
         callback(this.currentState);
       });
+
+      // 确保 PIXI 应用已初始化
+      if (!this.app || !this.app.renderer) {
+        console.warn("[AnimationSequenceManager] PIXI Application not ready, skipping animation load");
+        return;
+      }
 
       // 加载新动画
       try {
