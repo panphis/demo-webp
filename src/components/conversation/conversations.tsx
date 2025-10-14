@@ -11,7 +11,6 @@ import { ConversationItem } from "./conversation-item";
 
 import { GroupedItems } from "@/types";
 import { cn } from "../../lib/utils";
-import { WaitAnimation as Wait } from "../animation/animation";
 
 import imgSrc from "./wait-122-15000x15000-1000x1000.webp";
 import { Config } from "@/types";
@@ -32,7 +31,6 @@ const EmptyConversation = () => {
     <div className="flex flex-col gap-4 items-center relative bottom-[-100px]">
       <p className="text-4xl font-bold">Empty</p>
       <p className="text-[18px] font-normal text-foreground">Description</p>
-      <Wait config={config} />
     </div>
   );
 };
