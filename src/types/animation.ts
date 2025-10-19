@@ -41,9 +41,9 @@ export interface AnimationConfig {
 
 // 动画资源映射（使用内部状态）
 export type AnimationResources = {
-  [K in InternalAnimationState]: {
-    [S in AnimationSubState]: AnimationConfig;
-  };
+  [K in InternalAnimationState]: K extends InternalAnimationState.WAIT 
+    ? { repeat: AnimationConfig }  // WAIT 状态只有 repeat
+    : { [S in AnimationSubState]: AnimationConfig };  // 其他状态有完整的 start/repeat/end
 };
 
 // 状态映射函数

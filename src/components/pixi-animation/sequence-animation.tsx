@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { animationSequenceManager } from "./animation-sequence-manager";
-import { AnimationMainState, AnimationState } from "../../types/animation";
+import { AnimationMainState, AnimationState, AnimationSubState } from "../../types/animation";
 
 type Props = {
   className?: string;
@@ -23,11 +23,11 @@ export const SequenceAnimation = forwardRef<SequenceAnimationRef, Props>(
   ({ className, targetState, onStateChange, onAnimationComplete }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasMountRef = useRef<HTMLDivElement>(null);
-    const [status, setStatus] = useState("Loading...");
-    const [currentState, setCurrentState] = useState<AnimationState>({
-      main: AnimationMainState.INIT,
-      sub: "start" as any
-    });
+  const [status, setStatus] = useState("Loading...");
+  const [currentState, setCurrentState] = useState<AnimationState>({
+    main: AnimationMainState.INIT,
+    sub: AnimationSubState.START
+  });
 
     // 暴露控制接口
     useImperativeHandle(ref, () => ({

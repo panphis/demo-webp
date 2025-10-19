@@ -2,13 +2,13 @@
 
 import { useRef, useState } from "react";
 import { SequenceAnimation, SequenceAnimationRef } from "@/components/pixi-animation";
-import { AnimationMainState, AnimationState } from "@/types/animation";
+import { AnimationMainState, AnimationState, AnimationSubState } from "@/types/animation";
 
 export default function SequenceAnimationPage() {
   const animationRef = useRef<SequenceAnimationRef>(null);
   const [currentState, setCurrentState] = useState<AnimationState>({
     main: AnimationMainState.INIT,
-    sub: "start" as any
+    sub: AnimationSubState.START
   });
   const [targetState, setTargetState] = useState<AnimationMainState>(AnimationMainState.INIT);
 

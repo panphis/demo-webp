@@ -1,6 +1,6 @@
 /**
- * 动画序列管理器
- * 负责管理多个动画的连续播放和状态切换
+ * 简化的动画序列管理器
+ * 专注于动画的流畅播放和状态切换
  */
 
 import * as PIXI from "pixi.js";
@@ -11,10 +11,9 @@ import {
   AnimationConfig,
   StateChangeCallback,
   AnimationCompleteCallback,
-  InternalAnimationState,
-  mapMainStateToInternal
+  mapMainStateToInternal,
+  InternalAnimationState
 } from '../../types/animation';
-import { animationResources } from './animation-resources';
 import { resourceCacheManager } from './resource-cache';
 
 class AnimationSequenceManager {
@@ -22,10 +21,7 @@ class AnimationSequenceManager {
   private app: PIXI.Application | null = null;
   private animatedSprite: PIXI.AnimatedSprite | null = null;
   private currentContainer: HTMLDivElement | null = null;
-  private isInitializing = false;
-  private activeContainers = new Set<HTMLDivElement>();
-  private initializationPromise: Promise<boolean> | null = null;
-  private initializationResolvers: Array<(value: boolean) => void> = [];
+  private isInitialized = false;
 
   // 状态管理
   private currentState: AnimationState = {
@@ -40,12 +36,6 @@ class AnimationSequenceManager {
   private stateChangeCallbacks: StateChangeCallback[] = [];
   private animationCompleteCallbacks: AnimationCompleteCallback[] = [];
 
-  // 动画控制
-  private frameCount = 0;
-  private currentFrame = 0;
-  private isLooping = false;
-  private animationDriver: (() => void) | null = null;
-
   private constructor() {}
 
   static getInstance(): AnimationSequenceManager {
@@ -59,26 +49,15 @@ class AnimationSequenceManager {
    * 设置目标主状态
    */
   setTargetState(mainState: AnimationMainState): void {
+    if (mainState === this.currentState.main) {
+      return;
+    }
+
     this.targetMainState = mainState;
     
-    // 只有在应用已初始化时才进行状态转换
-    if (this.app && this.app.renderer) {
-      this.checkAndTransition();
+    if (this.isInitialized) {
+      this.handleStateChange();
     }
-  }
-
-  /**
-   * 预加载所有资源
-   */
-  async preloadResources(): Promise<void> {
-    return resourceCacheManager.preloadAllResources();
-  }
-
-  /**
-   * 获取资源加载状态
-   */
-  getResourceStats() {
-    return resourceCacheManager.getCacheStats();
   }
 
   /**
@@ -114,29 +93,10 @@ class AnimationSequenceManager {
    * 初始化动画系统
    */
   async initialize(container: HTMLDivElement): Promise<boolean> {
-    if (this.activeContainers.has(container)) {
-      return true;
-    }
-
-    if (this.isInitializing && this.initializationPromise) {
-      await this.initializationPromise;
-      this.activeContainers.add(container);
+    if (this.isInitialized && this.app) {
       this.moveToContainer(container);
       return true;
     }
-
-    if (this.app && this.animatedSprite) {
-      this.activeContainers.add(container);
-      this.moveToContainer(container);
-      return true;
-    }
-
-    this.isInitializing = true;
-    this.activeContainers.add(container);
-    
-    this.initializationPromise = new Promise<boolean>((resolve) => {
-      this.initializationResolvers.push(resolve);
-    });
 
     try {
       // 创建 PIXI 应用
@@ -150,29 +110,14 @@ class AnimationSequenceManager {
         autoDensity: true,
       });
 
-      // 初始化第一个动画
+      // 加载初始动画
       await this.loadAnimation(this.currentState);
-
       this.moveToContainer(container);
-
-      this.isInitializing = false;
-      this.initializationResolvers.forEach(resolve => resolve(true));
-      this.initializationResolvers = [];
-      this.initializationPromise = null;
-      
-      // 初始化完成后，检查是否需要状态转换
-      this.checkAndTransition();
+      this.isInitialized = true;
       
       return true;
     } catch (error) {
       console.error("[AnimationSequenceManager] Initialization failed:", error);
-      this.isInitializing = false;
-      this.activeContainers.delete(container);
-      
-      this.initializationResolvers.forEach(resolve => resolve(false));
-      this.initializationResolvers = [];
-      this.initializationPromise = null;
-      
       this.cleanup();
       throw error;
     }
@@ -186,10 +131,7 @@ class AnimationSequenceManager {
       throw new Error("PIXI Application not initialized");
     }
 
-    // 将主状态映射到内部状态
     const internalState = mapMainStateToInternal(state.main);
-    
-    // 从缓存获取资源
     const cachedResource = await resourceCacheManager.getResource(internalState, state.sub);
     const { texture, frames, config } = cachedResource;
     this.currentConfig = config;
@@ -209,23 +151,17 @@ class AnimationSequenceManager {
 
     // 配置动画
     newAnimatedSprite.animationSpeed = 1;
-    newAnimatedSprite.loop = false; // 不自动循环，由我们控制
+    newAnimatedSprite.loop = false;
 
-    // 先添加新的动画精灵
-    this.app.stage.addChild(newAnimatedSprite);
-
-    // 然后移除旧的动画精灵
+    // 移除旧的动画精灵
     if (this.animatedSprite) {
       this.app.stage.removeChild(this.animatedSprite);
       this.animatedSprite.destroy();
     }
 
-    // 更新引用
+    // 添加新的动画精灵
+    this.app.stage.addChild(newAnimatedSprite);
     this.animatedSprite = newAnimatedSprite;
-
-    // 设置帧数
-    this.frameCount = frames.length;
-    this.currentFrame = 0;
 
     // 开始播放
     this.startAnimation();
@@ -240,76 +176,26 @@ class AnimationSequenceManager {
     }
 
     this.isPlaying = true;
-    this.currentFrame = 0;
     this.animatedSprite.gotoAndStop(0);
 
     // 设置循环模式
-    this.isLooping = this.shouldLoop();
+    const shouldLoop = this.currentState.sub === AnimationSubState.REPEAT;
+    this.animatedSprite.loop = shouldLoop;
 
-    // 启动动画驱动
-    this.startAnimationDriver();
-  }
-
-  /**
-   * 判断是否应该循环播放
-   */
-  private shouldLoop(): boolean {
-    // repeat 状态需要循环，其他状态播放一次
-    return this.currentState.sub === AnimationSubState.REPEAT;
-  }
-
-  /**
-   * 启动动画驱动
-   */
-  private startAnimationDriver(): void {
-    if (!this.app || !this.animatedSprite) {
-      return;
+    // 确保 ticker 正在运行
+    if (!this.app.ticker.started) {
+      this.app.ticker.start();
     }
 
-    // 移除旧的驱动
-    this.stopAnimationDriver();
+    // 启动动画
+    this.animatedSprite.play();
 
-    let lastFrameTime = 0;
-    this.animationDriver = () => {
-      if (!this.animatedSprite || !this.app || !this.isPlaying) {
-        return;
-      }
-
-      try {
-        const deltaMS = this.app.ticker.deltaMS || 16.67;
-        lastFrameTime += deltaMS;
-        const frameTime = 1000 / 48; // 48fps
-
-        if (lastFrameTime >= frameTime) {
-          const steps = Math.floor(lastFrameTime / frameTime);
-          lastFrameTime = lastFrameTime % frameTime;
-          
-          this.currentFrame = (this.currentFrame + steps) % this.frameCount;
-          this.animatedSprite.gotoAndStop(this.currentFrame);
-
-          // 检查是否播放完成
-          if (this.currentFrame === this.frameCount - 1) {
-            this.onAnimationFinished();
-          }
-        }
-      } catch (error) {
-        console.warn("[AnimationSequenceManager] Animation driver error:", error);
-      }
+    // 监听动画完成事件
+    this.animatedSprite.onComplete = () => {
+      this.onAnimationFinished();
     };
 
-    if (this.app.ticker) {
-      this.app.ticker.add(this.animationDriver);
-    }
-  }
-
-  /**
-   * 停止动画驱动
-   */
-  private stopAnimationDriver(): void {
-    if (this.app && this.app.ticker && this.animationDriver) {
-      this.app.ticker.remove(this.animationDriver);
-      this.animationDriver = null;
-    }
+    console.log(`[AnimationSequenceManager] Started animation: ${this.currentState.main}-${this.currentState.sub}, loop: ${shouldLoop}`);
   }
 
   /**
@@ -330,6 +216,22 @@ class AnimationSequenceManager {
   }
 
   /**
+   * 处理状态变更
+   */
+  private handleStateChange(): void {
+    if (this.targetMainState === this.currentState.main) {
+      return;
+    }
+
+    // 如果当前是 repeat 状态，直接切换到目标状态
+    if (this.currentState.sub === AnimationSubState.REPEAT) {
+      this.transitionToNextState();
+    } else {
+      this.checkAndTransition();
+    }
+  }
+
+  /**
    * 检查并执行状态转换
    */
   private checkAndTransition(): void {
@@ -337,23 +239,15 @@ class AnimationSequenceManager {
     
     if (shouldTransition) {
       this.transitionToNextState();
-    } else if (this.isLooping) {
-      // 循环播放当前动画
-      this.currentFrame = 0;
-      if (this.animatedSprite) {
-        this.animatedSprite.gotoAndStop(0);
-      }
-    } else {
-      // 停止播放
-      this.isPlaying = false;
     }
+    // 移除 repeat 状态下的自动重新播放，避免干扰状态切换
   }
 
   /**
    * 判断是否应该转换到下一个状态
    */
   private shouldTransitionToNextState(): boolean {
-    // 如果目标状态与当前主状态不同，需要转换到 end 状态
+    // 如果目标状态与当前主状态不同，需要转换
     if (this.targetMainState !== this.currentState.main) {
       return true;
     }
@@ -361,11 +255,6 @@ class AnimationSequenceManager {
     // 如果当前是 start 状态，应该转换到 repeat
     if (this.currentState.sub === AnimationSubState.START) {
       return true;
-    }
-
-    // 如果当前是 repeat 状态，只有在目标状态改变时才转换到 end
-    if (this.currentState.sub === AnimationSubState.REPEAT) {
-      return false; // repeat 状态持续播放，直到目标状态改变
     }
 
     return false;
@@ -378,24 +267,34 @@ class AnimationSequenceManager {
     const nextState = this.getNextState();
     
     if (nextState) {
+      console.log(`[AnimationSequenceManager] Transitioning from ${this.currentState.main}-${this.currentState.sub} to ${nextState.main}-${nextState.sub}`);
+      
+      // 停止当前动画
+      if (this.animatedSprite) {
+        this.animatedSprite.stop();
+        this.animatedSprite.onComplete = undefined; // 清除事件监听
+      }
+      this.isPlaying = false;
+
+      // 更新状态
       this.currentState = nextState;
       
       // 触发状态变化回调
       this.stateChangeCallbacks.forEach(callback => {
-        callback(this.currentState);
+        try {
+          callback(this.currentState);
+        } catch (error) {
+          console.error("[AnimationSequenceManager] Error in state change callback:", error);
+        }
       });
-
-      // 确保 PIXI 应用已初始化
-      if (!this.app || !this.app.renderer) {
-        console.warn("[AnimationSequenceManager] PIXI Application not ready, skipping animation load");
-        return;
-      }
 
       // 加载新动画
       try {
         await this.loadAnimation(this.currentState);
       } catch (error) {
         console.error("[AnimationSequenceManager] Failed to load animation:", error);
+        // 如果加载失败，尝试恢复到上一个状态
+        this.isPlaying = false;
       }
     }
   }
@@ -406,8 +305,17 @@ class AnimationSequenceManager {
   private getNextState(): AnimationState | null {
     const { main, sub } = this.currentState;
 
-    // 如果目标主状态与当前不同，先播放当前状态的 end 动画
+    // 如果目标主状态与当前不同，需要切换
     if (this.targetMainState !== main) {
+      // 如果是 WAIT 状态，直接切换到目标状态
+      if (mapMainStateToInternal(main) === InternalAnimationState.WAIT) {
+        return {
+          main: this.targetMainState,
+          sub: AnimationSubState.START
+        };
+      }
+      
+      // 其他状态先播放 end 动画
       if (sub !== AnimationSubState.END) {
         return {
           main,
@@ -430,10 +338,8 @@ class AnimationSequenceManager {
           sub: AnimationSubState.REPEAT
         };
       case AnimationSubState.REPEAT:
-        // repeat 状态持续播放，不自动转换
-        return null;
+        return null; // repeat 状态持续播放
       case AnimationSubState.END:
-        // end 状态后，切换到目标状态
         return {
           main: this.targetMainState,
           sub: AnimationSubState.START
@@ -448,7 +354,6 @@ class AnimationSequenceManager {
    */
   private moveToContainer(container: HTMLDivElement): void {
     if (!this.app || !this.app.renderer || !this.app.renderer.canvas) {
-      console.warn("[AnimationSequenceManager] Cannot move container: PixiJS objects not initialized");
       return;
     }
 
@@ -495,14 +400,8 @@ class AnimationSequenceManager {
    * 注销容器
    */
   unregisterContainer(container: HTMLDivElement): void {
-    this.activeContainers.delete(container);
-
-    if (this.activeContainers.size === 0) {
-      setTimeout(() => {
-        if (this.activeContainers.size === 0) {
-          this.cleanup();
-        }
-      }, 100);
+    if (this.currentContainer === container) {
+      this.cleanup();
     }
   }
 
@@ -510,9 +409,6 @@ class AnimationSequenceManager {
    * 清理资源
    */
   private cleanup(): void {
-    // 停止动画驱动
-    this.stopAnimationDriver();
-
     if (this.app) {
       // 清理 ResizeObserver
       const appWithObserver = this.app as PIXI.Application & { _resizeObserver?: ResizeObserver };
@@ -537,7 +433,7 @@ class AnimationSequenceManager {
 
     this.animatedSprite = null;
     this.currentContainer = null;
-    this.activeContainers.clear();
+    this.isInitialized = false;
     this.isPlaying = false;
   }
 }

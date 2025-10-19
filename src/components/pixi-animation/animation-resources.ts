@@ -19,23 +19,7 @@ import talkingEndImg from './talking-end-14-10000x10000-1000x1000.webp';
  */
 export const animationResources: AnimationResources = {
   [InternalAnimationState.WAIT]: {
-    start: {
-      width: 15000,
-      height: 15000,
-      cellWidth: 1000,
-      cellHeight: 1000,
-      count: 122,
-      imgSrc: waitImg.src,
-    },
     repeat: {
-      width: 15000,
-      height: 15000,
-      cellWidth: 1000,
-      cellHeight: 1000,
-      count: 122,
-      imgSrc: waitImg.src,
-    },
-    end: {
       width: 15000,
       height: 15000,
       cellWidth: 1000,

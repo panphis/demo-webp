@@ -1,6 +1,6 @@
 /**
- * 动画资源缓存管理器
- * 负责预加载和缓存所有动画资源
+ * 简化的动画资源缓存管理器
+ * 专注于按需加载和基本缓存
  */
 
 import * as PIXI from "pixi.js";
@@ -16,8 +16,6 @@ interface CachedTexture {
 class ResourceCacheManager {
   private static instance: ResourceCacheManager;
   private cache = new Map<string, CachedTexture>();
-  private loadingPromises = new Map<string, Promise<CachedTexture>>();
-  private isPreloading = false;
 
   private constructor() {}
 
@@ -26,45 +24,6 @@ class ResourceCacheManager {
       ResourceCacheManager.instance = new ResourceCacheManager();
     }
     return ResourceCacheManager.instance;
-  }
-
-  /**
-   * 预加载所有动画资源
-   */
-  async preloadAllResources(): Promise<void> {
-    if (this.isPreloading) {
-      return;
-    }
-
-    this.isPreloading = true;
-    console.log("[ResourceCache] 开始预加载所有动画资源...");
-
-    const loadPromises: Promise<void>[] = [];
-
-    // 遍历所有状态和子状态
-    Object.values(InternalAnimationState).forEach(mainState => {
-      Object.values(AnimationSubState).forEach(subState => {
-        const config = animationResources[mainState][subState];
-        const cacheKey = this.getCacheKey(mainState, subState);
-        
-        if (!this.cache.has(cacheKey)) {
-          loadPromises.push(
-            this.loadResource(mainState, subState, config).then(() => {
-              console.log(`[ResourceCache] 已加载: ${mainState}-${subState}`);
-            })
-          );
-        }
-      });
-    });
-
-    try {
-      await Promise.all(loadPromises);
-      console.log("[ResourceCache] 所有资源预加载完成");
-    } catch (error) {
-      console.error("[ResourceCache] 预加载失败:", error);
-    } finally {
-      this.isPreloading = false;
-    }
   }
 
   /**
@@ -78,44 +37,24 @@ class ResourceCacheManager {
       return this.cache.get(cacheKey)!;
     }
 
-    // 如果正在加载，等待加载完成
-    if (this.loadingPromises.has(cacheKey)) {
-      return this.loadingPromises.get(cacheKey)!;
+    // 检查该状态是否有对应的子状态配置
+    const stateConfig = animationResources[mainState];
+    if (!stateConfig || !(subState in stateConfig)) {
+      throw new Error(`No configuration found for ${mainState}-${subState}`);
     }
 
-    // 开始加载
-    const config = animationResources[mainState][subState];
-    return this.loadResource(mainState, subState, config);
+    // 加载资源
+    const config = stateConfig[subState as keyof typeof stateConfig];
+    const result = await this.loadResource(config);
+    this.cache.set(cacheKey, result);
+    
+    return result;
   }
 
   /**
    * 加载单个资源
    */
-  private async loadResource(
-    mainState: InternalAnimationState, 
-    subState: AnimationSubState, 
-    config: AnimationConfig
-  ): Promise<CachedTexture> {
-    const cacheKey = this.getCacheKey(mainState, subState);
-
-    const loadPromise = this._loadResourceInternal(config);
-    this.loadingPromises.set(cacheKey, loadPromise);
-
-    try {
-      const result = await loadPromise;
-      this.cache.set(cacheKey, result);
-      this.loadingPromises.delete(cacheKey);
-      return result;
-    } catch (error) {
-      this.loadingPromises.delete(cacheKey);
-      throw error;
-    }
-  }
-
-  /**
-   * 内部加载实现
-   */
-  private async _loadResourceInternal(config: AnimationConfig): Promise<CachedTexture> {
+  private async loadResource(config: AnimationConfig): Promise<CachedTexture> {
     // 加载纹理
     const texture = await PIXI.Assets.load(config.imgSrc);
     
@@ -170,12 +109,19 @@ class ResourceCacheManager {
   /**
    * 获取缓存统计信息
    */
-  getCacheStats(): { loaded: number; total: number; loading: number } {
-    const total = Object.keys(InternalAnimationState).length * Object.keys(AnimationSubState).length;
-    const loaded = this.cache.size;
-    const loading = this.loadingPromises.size;
+  getCacheStats(): { loaded: number; total: number } {
+    // 计算实际可用的状态组合数量
+    let total = 0;
+    Object.values(InternalAnimationState).forEach(mainState => {
+      const stateConfig = animationResources[mainState];
+      if (stateConfig) {
+        total += Object.keys(stateConfig).length;
+      }
+    });
     
-    return { loaded, total, loading };
+    const loaded = this.cache.size;
+    
+    return { loaded, total };
   }
 
   /**
@@ -189,8 +135,6 @@ class ResourceCacheManager {
     });
     
     this.cache.clear();
-    this.loadingPromises.clear();
-    this.isPreloading = false;
   }
 }
 
