@@ -10,7 +10,6 @@ import { AnimationConfig, InternalAnimationState } from "../../types/animation";
 import { animationResources } from "./animation-resources";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-
 interface CachedTexture {
   texture: PIXI.Texture;
   frames: PIXI.Texture[];
@@ -30,11 +29,19 @@ export class ResourceCacheManager {
   }
 
   private async loadResources(): Promise<void> {
+    // 检查是否在客户端环境
+    if (typeof window === "undefined") {
+      console.warn("PIXI.js resources cannot be loaded on server side");
+      this.initialized = true;
+      this.loading = false;
+      this.notify();
+      return;
+    }
+
     // 如果已经完成过一次初始化加载，且没有缺失，则直接返回
-    const entries = Object.entries(animationResources) as Array<[
-      InternalAnimationState,
-      AnimationConfig
-    ]>;
+    const entries = Object.entries(animationResources) as Array<
+      [InternalAnimationState, AnimationConfig]
+    >;
     const missing = entries.filter(([state]) => !this.isResourceLoaded(state));
     if (missing.length === 0) {
       this.initialized = true;
@@ -57,7 +64,9 @@ export class ResourceCacheManager {
 
   static getInstance(): ResourceCacheManager {
     // 将单例提升到 globalThis，避免 HMR/路由切换重新实例化
-    const g = globalThis as unknown as { __pixiResourceManager?: ResourceCacheManager };
+    const g = globalThis as unknown as {
+      __pixiResourceManager?: ResourceCacheManager;
+    };
     if (!g.__pixiResourceManager) {
       g.__pixiResourceManager = new ResourceCacheManager();
     }
@@ -89,6 +98,11 @@ export class ResourceCacheManager {
    * 加载单个资源
    */
   private async loadResource(config: AnimationConfig): Promise<CachedTexture> {
+    // 检查是否在客户端环境
+    if (typeof window === "undefined") {
+      throw new Error("PIXI.js resources cannot be loaded on server side");
+    }
+
     // 先尝试复用 PIXI.Assets 的缓存，避免重复网络请求
     let texture = PIXI.Assets.get(config.imgSrc) as PIXI.Texture | undefined;
     if (!texture) {
@@ -154,7 +168,9 @@ export class ResourceCacheManager {
 
   private notify(): void {
     this.listeners.forEach((l) => {
-      try { l(); } catch {}
+      try {
+        l();
+      } catch {}
     });
   }
 
@@ -232,9 +248,9 @@ export function useAnimationResources() {
   const managerRef = useRef(resourceCacheManager);
 
   const [loading, setLoading] = useState<boolean>(managerRef.current.loading);
-  const [resources, setResources] = useState<Partial<Record<InternalAnimationState, CachedTexture>>>(
-    () => managerRef.current.getAllCached()
-  );
+  const [resources, setResources] = useState<
+    Partial<Record<InternalAnimationState, CachedTexture>>
+  >(() => managerRef.current.getAllCached());
 
   useEffect(() => {
     const unsubscribe = managerRef.current.subscribe(() => {
@@ -251,4 +267,3 @@ export function useAnimationResources() {
 
   return { loading, resources };
 }
-

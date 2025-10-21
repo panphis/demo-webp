@@ -1,9 +1,5 @@
-import { PixiWait, LoadingButton } from "@/components";
+import { Animation, LoadingButton } from "@/components";
 
 export default function Home() {
-  return (
-    <main>
-      main
-    </main>
-  );
+  return <main>main</main>;
 }
