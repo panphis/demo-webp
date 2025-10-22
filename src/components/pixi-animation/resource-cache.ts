@@ -10,7 +10,7 @@ import { AnimationConfig, InternalAnimationState } from "../../types/animation";
 import { animationResources } from "./animation-resources";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-interface CachedTexture {
+export interface CachedTexture {
   texture: PIXI.Texture;
   frames: PIXI.Texture[];
   config: AnimationConfig;
@@ -167,7 +167,7 @@ export class ResourceCacheManager {
   }
 
   private notify(): void {
-    this.listeners.forEach((l) => {
+    this.listeners.forEach(l => {
       try {
         l();
       } catch {}
@@ -188,7 +188,7 @@ export class ResourceCacheManager {
   getCacheStats(): { loaded: number; total: number } {
     // 计算实际可用的状态组合数量
     let total = 0;
-    Object.values(InternalAnimationState).forEach((mainState) => {
+    Object.values(InternalAnimationState).forEach(mainState => {
       const stateConfig = animationResources[mainState];
       if (stateConfig) {
         // 每个内部状态对应一个资源配置
@@ -206,9 +206,9 @@ export class ResourceCacheManager {
    */
   clearCache(): void {
     // 销毁所有纹理
-    this.cache.forEach((cached) => {
+    this.cache.forEach(cached => {
       cached.texture.destroy();
-      cached.frames.forEach((frame) => frame.destroy());
+      cached.frames.forEach(frame => frame.destroy());
     });
 
     this.cache.clear();
@@ -227,7 +227,7 @@ export class ResourceCacheManager {
    */
   getAllCached(): Partial<Record<InternalAnimationState, CachedTexture>> {
     const result: Partial<Record<InternalAnimationState, CachedTexture>> = {};
-    Object.values(InternalAnimationState).forEach((state) => {
+    Object.values(InternalAnimationState).forEach(state => {
       const cached = this.getCached(state);
       if (cached) {
         result[state] = cached;

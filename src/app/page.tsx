@@ -1,5 +1,9 @@
-import { Animation, LoadingButton } from "@/components";
+import Link from "next/link";
 
 export default function Home() {
-  return <main>main</main>;
+  return (
+    <main>
+      <Link href="/demo">Demo</Link>
+    </main>
+  );
 }

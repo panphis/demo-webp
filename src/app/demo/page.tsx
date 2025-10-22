@@ -1,8 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
-import { Animation } from "@/components/pixi-animation";
+const NoSSRAnimation = dynamic(
+  () => import("@/components/pixi-animation/animation"),
+  {
+    ssr: false,
+  }
+);
 
 export default function HomePage() {
   return (
@@ -14,9 +19,7 @@ export default function HomePage() {
 
         {/* 动画容器 */}
         <div className="shadow-lg p-6 mb-8">
-          <div className="h-96 w-96 mx-auto">
-            <Animation />
-          </div>
+          <NoSSRAnimation />
         </div>
       </div>
     </div>
