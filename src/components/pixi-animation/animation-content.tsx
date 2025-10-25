@@ -21,18 +21,10 @@ export const AnimationContent: FC = () => {
   // 初始化动画控制器
   useEffect(() => {
     controllerRef.current = new AnimationController();
-
     return () => {
       controllerRef.current?.destroy();
     };
   }, []);
-
-  // 确保在组件挂载后开始播放
-  useEffect(() => {
-    if (isPlaying) {
-      console.log("Component mounted, should start playing");
-    }
-  }, [isPlaying]);
 
   // 处理状态切换
   const handleStateChange = useCallback((newState: InternalAnimationState) => {
@@ -95,7 +87,6 @@ export const AnimationContent: FC = () => {
           currentState={currentState}
           autoPlay={isPlaying}
           loop={true}
-          fps={24}
           onComplete={handleAnimationComplete}
           onStateChange={handleStateChange}
         />

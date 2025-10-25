@@ -25,17 +25,10 @@ interface AnimationUnitProps {
 export const AnimationUnit: FC<AnimationUnitProps> = ({
   currentState = InternalAnimationState.wait,
   autoPlay = true,
-  loop = true,
-  fps = 24,
+  loop = false,
   onComplete,
   onStateChange,
 }) => {
-  console.log("AnimationUnit component rendered", {
-    currentState,
-    autoPlay,
-    loop,
-    fps,
-  });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const spriteRef = useRef<PIXI.Sprite | null>(null);
@@ -98,20 +91,11 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 初始化 PIXI 应用
   const initializePixi = useCallback(async () => {
-    console.log("initializePixi called", {
-      hasCanvas: !!canvasRef.current,
-      hasApp: !!appRef.current,
-      isMounted,
-      containerSize,
-    });
-
     if (!canvasRef.current || appRef.current || !isMounted) {
-      console.log("initializePixi early return");
       return;
     }
 
     try {
-      console.log("Creating PIXI Application...");
       const app = new PIXI.Application();
       await app.init({
         canvas: canvasRef.current,
@@ -125,7 +109,6 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
       appRef.current = app;
       setIsInitialized(true);
-      console.log("PIXI Application initialized successfully");
     } catch (error) {
       console.error("Failed to initialize PIXI:", error);
     }
@@ -133,12 +116,6 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 创建动画精灵
   const createAnimatedSprite = useCallback(async () => {
-    console.log("createAnimatedSprite called", {
-      hasApp: !!appRef.current,
-      hasResource: !!currentResource,
-      autoPlay,
-    });
-
     if (!appRef.current || !currentResource) return;
 
     try {
@@ -151,7 +128,6 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       const { frames } = currentResource;
       const totalFrames = frames.length;
 
-      console.log("Creating animated sprite with frames:", totalFrames);
       if (totalFrames === 0) {
         return;
       }
@@ -181,7 +157,6 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
       // 如果自动播放，开始动画
       if (autoPlay) {
-        console.log("Auto play triggered, starting animation");
         // 直接在这里开始动画，避免循环依赖
         animationRef.current.isPlaying = true;
         animationRef.current.totalFrames = totalFrames;
@@ -214,7 +189,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
         };
 
         // 开始动画循环
-        const frameInterval = 1000 / fps;
+        const frameInterval = 1000 / currentResource.config.fps;
         animationRef.current.timeoutId = setTimeout(() => {
           animationRef.current.animationId = requestAnimationFrame(animate);
         }, frameInterval);
@@ -228,18 +203,12 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     containerSize.height,
     autoPlay,
     loop,
-    fps,
+    currentResource,
     onComplete,
   ]);
 
   // 开始动画
   const startAnimation = useCallback(() => {
-    console.log("startAnimation called", {
-      hasSprite: !!spriteRef.current,
-      hasResource: !!currentResource,
-      autoPlay,
-    });
-
     if (!spriteRef.current || !currentResource) return;
 
     const { frames } = currentResource;
@@ -278,11 +247,11 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     };
 
     // 开始动画循环
-    const frameInterval = 1000 / fps;
+    const frameInterval = 1000 / currentResource.config.fps;
     animationRef.current.timeoutId = setTimeout(() => {
       animationRef.current.animationId = requestAnimationFrame(animate);
     }, frameInterval);
-  }, [currentResource, loop, fps, onComplete]);
+  }, [currentResource, loop, onComplete]);
 
   // 停止动画
   const stopAnimation = useCallback(() => {
@@ -332,7 +301,6 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       containerSize.width > 0 &&
       containerSize.height > 0
     ) {
-      console.log("Canvas mounted, initializing PIXI");
       // 使用 setTimeout 确保 canvas 完全渲染
       setTimeout(() => {
         initializePixi();
@@ -348,24 +316,12 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 初始化 PIXI 应用
   useEffect(() => {
-    console.log("PIXI initialization effect triggered", {
-      containerSize,
-      isMounted,
-      hasCanvas: !!canvasRef.current,
-      shouldInitialize:
-        containerSize.width > 0 &&
-        containerSize.height > 0 &&
-        isMounted &&
-        canvasRef.current,
-    });
-
     if (
       containerSize.width > 0 &&
       containerSize.height > 0 &&
       isMounted &&
       canvasRef.current
     ) {
-      console.log("Calling initializePixi");
       initializePixi();
     }
   }, [initializePixi, containerSize.width, containerSize.height, isMounted]);
@@ -404,37 +360,14 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 当资源加载完成时创建动画精灵
   useEffect(() => {
-    console.log("Resource loading effect triggered", {
-      isInitialized,
-      hasResource: !!currentResource,
-      loading,
-      autoPlay,
-    });
-
-    console.log("Checking resource loading conditions:", {
-      isInitialized,
-      hasCurrentResource: !!currentResource,
-      notLoading: !loading,
-      allConditionsMet: isInitialized && currentResource && !loading,
-    });
-
     if (isInitialized && currentResource && !loading) {
-      console.log("Calling createAnimatedSprite from resource loading effect");
       createAnimatedSprite();
     }
   }, [isInitialized, currentResource, loading, createAnimatedSprite]);
 
   // 当状态改变时重新创建动画
   useEffect(() => {
-    console.log("State change effect triggered", {
-      currentState,
-      hasResource: !!currentResource,
-      isInitialized,
-      autoPlay,
-    });
-
     if (currentResource && isInitialized) {
-      console.log("Calling createAnimatedSprite from state change effect");
       createAnimatedSprite();
     }
   }, [currentState, createAnimatedSprite, currentResource, isInitialized]);
@@ -457,19 +390,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     }
   }, [controls]);
 
-  // 显示加载状态
-  if (loading || !isInitialized) {
-    return (
-      <div
-        ref={containerRef}
-        className="relative w-full h-full"
-        style={{ minHeight: "200px" }}
-      >
-        <Placeholder />
-      </div>
-    );
-  }
-
+  // 始终渲染 canvas，必要时以占位层覆盖，避免初始化死锁
   return (
     <div
       ref={containerRef}
@@ -485,7 +406,12 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
           display: "block",
         }}
       />
-      {!currentResource && (
+      {(loading || !isInitialized) && (
+        <div className="absolute inset-0">
+          <Placeholder />
+        </div>
+      )}
+      {!loading && isInitialized && !currentResource && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <div className="text-gray-600">Animation resource not available</div>
         </div>
