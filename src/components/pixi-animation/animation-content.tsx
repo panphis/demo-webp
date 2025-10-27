@@ -1,20 +1,25 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, Fragment } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { FC } from "react";
 import { AnimationUnit } from "./animation-unit";
 import { InternalAnimationState } from "../../types/animation";
-import {
-  AnimationController,
-  AnimationSequences,
-} from "./animation-controller";
+import { AnimationController } from "./animation-controller";
 
-export const AnimationContent: FC = () => {
+export enum AnimationStatus {
+  THINKING = "thinking",
+  LISTENING = "listening",
+  SPEAKING = "speaking",
+}
+
+type AnimationContentProps = {
+  status: AnimationStatus;
+};
+
+export const AnimationContent: FC<AnimationContentProps> = ({ status }) => {
   const [currentState, setCurrentState] = useState<InternalAnimationState>(
     InternalAnimationState.wait
   );
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [currentSequence, setCurrentSequence] = useState<string>("");
 
   const controllerRef = useRef<AnimationController | null>(null);
 
@@ -26,57 +31,93 @@ export const AnimationContent: FC = () => {
     };
   }, []);
 
-  // 处理状态切换
-  const handleStateChange = useCallback((newState: InternalAnimationState) => {
-    setCurrentState(newState);
-  }, []);
-
   // 处理动画完成
   const handleAnimationComplete = useCallback(() => {
-    console.log("Animation completed for state:", currentState);
-  }, [currentState]);
+    console.log(
+      "Animation completed for status:",
+      status,
+      "currentState:",
+      currentState
+    );
+    // console.log("Animation completed for state:", currentState);
+    // thinking
+    // 循环播放 wait 状态
+    // listening
+    // 播放 writing_start 状态
+    // writing_start 播放完成之后 查看status 是否为 listening，如果是，则播放 writing_repeat 状态 否则播放 writing_end 状态
+    // 等待状态改变成 其他状态的时候 先播放完 writing_end 状态，再切换到其他状态
+    // speaking
+    // 播放 talking_start 状态
+    // talking_start 播放完成之后 查看 status。是否为 speaking，如果是，则播放 talking_repeat 状态， 否则播放 talking_end 状态
+    // 等待状态改变成 其他状态的时候 先播放完 talking_end 状态，再切换到其他状态
+
+    // 如果是新的状态不是是听的状态 但是动画正在播放 writing_start 或 writing_repeat 状态，则播放 writing_end 状态
+    if (
+      status !== AnimationStatus.LISTENING &&
+      (currentState === InternalAnimationState.writing_start ||
+        currentState === InternalAnimationState.writing_repeat)
+    ) {
+      playState(InternalAnimationState.writing_end);
+      return;
+    }
+
+    // 如果 新的状态 不是 说的 状态 但动画还没说完
+    if (
+      status !== AnimationStatus.SPEAKING &&
+      (currentState === InternalAnimationState.talk_start ||
+        currentState === InternalAnimationState.talk_repeat)
+    ) {
+      playState(InternalAnimationState.talk_end);
+      return;
+    }
+
+    // 如果还在听的状态，且动画是 writing_start 或 writing_repeat 状态，则播放 writing_start 状态
+    if (
+      (status === AnimationStatus.LISTENING &&
+        currentState === InternalAnimationState.writing_start) ||
+      currentState === InternalAnimationState.writing_repeat
+    ) {
+      playState(InternalAnimationState.writing_repeat);
+      return;
+    }
+
+    if (
+      status === AnimationStatus.SPEAKING &&
+      (currentState === InternalAnimationState.talk_start ||
+        currentState === InternalAnimationState.talk_repeat)
+    ) {
+      playState(InternalAnimationState.talk_repeat);
+      return;
+    }
+
+    // wait / talk_end => listening
+    if (
+      status === AnimationStatus.LISTENING &&
+      (currentState === InternalAnimationState.wait ||
+        currentState === InternalAnimationState.talk_end)
+    ) {
+      playState(InternalAnimationState.writing_start);
+      return;
+    }
+
+    // wait / writing_end => speaking
+    if (
+      status === AnimationStatus.SPEAKING &&
+      (currentState === InternalAnimationState.wait ||
+        currentState === InternalAnimationState.writing_end)
+    ) {
+      playState(InternalAnimationState.talk_start);
+      return;
+    }
+
+    playState(InternalAnimationState.wait);
+  }, [status, currentState]);
 
   // 播放单个状态
   const playState = useCallback((state: InternalAnimationState) => {
+    console.log("playState:", state);
     controllerRef.current?.playState(state);
     setCurrentState(state);
-    setCurrentSequence("");
-  }, []);
-
-  // 播放动画序列
-  const playSequence = useCallback(
-    (sequenceName: keyof typeof AnimationSequences) => {
-      const sequence = AnimationSequences[sequenceName];
-      controllerRef.current?.playSequence(sequence);
-      setCurrentSequence(sequence.name);
-    },
-    []
-  );
-
-  // 播放控制
-  const handlePlayPause = useCallback(() => {
-    if (isPlaying) {
-      controllerRef.current?.pause();
-      setIsPlaying(false);
-    } else {
-      controllerRef.current?.playState(currentState);
-      setIsPlaying(true);
-    }
-  }, [isPlaying, currentState]);
-
-  // 停止动画
-  const handleStop = useCallback(() => {
-    controllerRef.current?.stop();
-    setIsPlaying(false);
-    setCurrentSequence("");
-  }, []);
-
-  // 重置动画
-  const handleReset = useCallback(() => {
-    controllerRef.current?.reset();
-    setCurrentState(InternalAnimationState.wait);
-    setIsPlaying(false);
-    setCurrentSequence("");
   }, []);
 
   return (
@@ -85,33 +126,14 @@ export const AnimationContent: FC = () => {
       <div className="w-96 h-96 rounded-lg overflow-hidden">
         <AnimationUnit
           currentState={currentState}
-          autoPlay={isPlaying}
+          autoPlay={true}
           loop={true}
           onComplete={handleAnimationComplete}
-          onStateChange={handleStateChange}
         />
       </div>
 
       {/* 控制面板 */}
       <div className="mt-4 p-4 bg-white rounded-lg shadow-sm border">
-        {/* 动画序列控制 */}
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">动画序列</h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(AnimationSequences).map(([key, sequence]) => (
-              <button
-                key={key}
-                onClick={() =>
-                  playSequence(key as keyof typeof AnimationSequences)
-                }
-                className="px-3 py-1 text-xs rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
-              >
-                {sequence.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* 单个状态控制 */}
         <div className="mb-4">
           <h3 className="text-sm font-medium text-gray-700 mb-2">单个状态</h3>
@@ -133,39 +155,9 @@ export const AnimationContent: FC = () => {
         </div>
 
         {/* 播放控制 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handlePlayPause}
-            className={`px-4 py-2 text-sm rounded-md transition-colors ${
-              isPlaying
-                ? "bg-red-500 text-white hover:bg-red-600"
-                : "bg-green-500 text-white hover:bg-green-600"
-            }`}
-          >
-            {isPlaying ? "暂停" : "播放"}
-          </button>
-
-          <button
-            onClick={handleStop}
-            className="px-4 py-2 text-sm rounded-md bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-          >
-            停止
-          </button>
-
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 text-sm rounded-md bg-gray-500 text-white hover:bg-gray-600 transition-colors"
-          >
-            重置
-          </button>
-
+        <div className="flex items-center gap-2 flex-wrap text-black">
           <div className="text-sm text-gray-600">
             当前状态: <span className="font-medium">{currentState}</span>
-            {currentSequence && (
-              <span className="ml-2 text-purple-600">
-                序列: {currentSequence}
-              </span>
-            )}
           </div>
         </div>
       </div>

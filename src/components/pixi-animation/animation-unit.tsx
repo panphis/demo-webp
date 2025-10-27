@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { FC } from "react";
-import * as PIXI from "pixi.js";
+import { Application, AnimatedSprite, Texture } from "pixi.js";
 import { useAnimationResources } from "./resource-cache";
 import { InternalAnimationState } from "../../types/animation";
 import { Placeholder } from "./placeholder";
@@ -14,12 +14,8 @@ interface AnimationUnitProps {
   autoPlay?: boolean;
   /** 是否循环播放 */
   loop?: boolean;
-  /** 动画播放速度 (fps) */
-  fps?: number;
   /** 动画完成回调 */
   onComplete?: () => void;
-  /** 状态切换回调 */
-  onStateChange?: (state: InternalAnimationState) => void;
 }
 
 export const AnimationUnit: FC<AnimationUnitProps> = ({
@@ -27,16 +23,16 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
   autoPlay = true,
   loop = false,
   onComplete,
-  onStateChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const appRef = useRef<PIXI.Application | null>(null);
-  const spriteRef = useRef<PIXI.Sprite | null>(null);
+  const appRef = useRef<Application | null>(null);
+  const spriteRef = useRef<AnimatedSprite | null>(null);
+  const currentResourceRef = useRef<any>(null); // 存储当前资源引用
+  const onCompleteRef = useRef(onComplete); // 使用 ref 保存最新的 onComplete
   const animationRef = useRef<{
     currentFrame: number;
     totalFrames: number;
     isPlaying: boolean;
-    animationId?: number;
     timeoutId?: NodeJS.Timeout;
   }>({
     currentFrame: 0,
@@ -44,14 +40,19 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     isPlaying: false,
   });
 
+  // 更新 onComplete ref - 确保闭包中总是使用最新的回调
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   const { loading, resources } = useAnimationResources();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [containerSize, setContainerSize] = useState({
     width: 400,
     height: 400,
   });
   const containerRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
 
   // 获取当前状态的资源
   const currentResource = useMemo(() => {
@@ -91,12 +92,12 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 初始化 PIXI 应用
   const initializePixi = useCallback(async () => {
-    if (!canvasRef.current || appRef.current || !isMounted) {
+    if (!canvasRef.current || appRef.current || !mountedRef.current) {
       return;
     }
 
     try {
-      const app = new PIXI.Application();
+      const app = new Application();
       await app.init({
         canvas: canvasRef.current,
         width: containerSize.width,
@@ -112,19 +113,90 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     } catch (error) {
       console.error("Failed to initialize PIXI:", error);
     }
-  }, [containerSize.width, containerSize.height, isMounted]);
+  }, [containerSize.width, containerSize.height]);
+
+  // 更新 sprite 的 textures（用于状态切换）
+  const updateSpriteTextures = useCallback(
+    (
+      frames: Texture[],
+      totalFrames: number,
+      fps: number,
+      shouldAutoPlay: boolean
+    ) => {
+      if (!spriteRef.current) return;
+
+      // 停止当前动画
+      animationRef.current.isPlaying = false;
+      if (animationRef.current.timeoutId) {
+        clearTimeout(animationRef.current.timeoutId);
+        animationRef.current.timeoutId = undefined;
+      }
+
+      // 更新动画状态
+      animationRef.current.currentFrame = 0;
+      animationRef.current.totalFrames = totalFrames;
+
+      // 更新 sprite 的第一帧
+      spriteRef.current.texture = frames[0];
+
+      // 如果自动播放，重新启动动画
+      if (shouldAutoPlay) {
+        animationRef.current.isPlaying = true;
+        const frameTime = 1000 / fps;
+        animationRef.current.timeoutId = setTimeout(() => {
+          animateWithRef(frames, totalFrames, fps);
+        }, frameTime);
+      }
+    },
+    []
+  );
+
+  // 动画驱动函数 - 使用 setTimeout 精确控制播放速度
+  const animateWithRef = (
+    frames: Texture[],
+    totalFrames: number,
+    fps: number
+  ) => {
+    if (!spriteRef.current || !animationRef.current.isPlaying) {
+      return;
+    }
+
+    try {
+      const currentFrame = animationRef.current.currentFrame;
+      spriteRef.current.texture = frames[currentFrame];
+
+      // 计算下一帧
+      let nextFrame = currentFrame + 1;
+
+      // 检查是否超过最后一帧
+      if (nextFrame >= totalFrames) {
+        onCompleteRef.current?.();
+        if (loop) {
+          nextFrame = 0; // 循环播放
+        } else {
+          // 单次播放：停留在最后一帧
+          animationRef.current.isPlaying = false;
+          return;
+        }
+      }
+
+      animationRef.current.currentFrame = nextFrame;
+
+      // 计算下一帧需要的等待时间（毫秒）
+      const frameTime = 1000 / fps;
+      animationRef.current.timeoutId = setTimeout(() => {
+        animateWithRef(frames, totalFrames, fps);
+      }, frameTime);
+    } catch (error) {
+      console.warn("[AnimationUnit] Animation error:", error);
+    }
+  };
 
   // 创建动画精灵
   const createAnimatedSprite = useCallback(async () => {
     if (!appRef.current || !currentResource) return;
 
     try {
-      // 清理现有精灵
-      if (spriteRef.current) {
-        appRef.current.stage.removeChild(spriteRef.current);
-        spriteRef.current.destroy();
-      }
-
       const { frames } = currentResource;
       const totalFrames = frames.length;
 
@@ -132,8 +204,27 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
         return;
       }
 
+      // 如果 sprite 已存在，只更新 textures，不重新创建
+      if (
+        spriteRef.current &&
+        appRef.current.stage.children.includes(spriteRef.current)
+      ) {
+        const fps = currentResource.config.fps;
+        updateSpriteTextures(frames, totalFrames, fps, autoPlay);
+        return;
+      }
+
+      // 清理现有精灵
+      if (spriteRef.current) {
+        appRef.current.stage.removeChild(spriteRef.current);
+        spriteRef.current.destroy();
+      }
+
       // 创建精灵并设置第一帧
-      const sprite = new PIXI.Sprite(frames[0]);
+      const sprite = new AnimatedSprite({
+        textures: frames,
+        autoUpdate: false,
+      });
       sprite.anchor.set(0.5);
       sprite.x = containerSize.width / 2;
       sprite.y = containerSize.height / 2;
@@ -149,6 +240,9 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       spriteRef.current = sprite;
 
       // 更新动画状态
+      if (animationRef.current.timeoutId) {
+        clearTimeout(animationRef.current.timeoutId);
+      }
       animationRef.current = {
         currentFrame: 0,
         totalFrames,
@@ -157,109 +251,43 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
       // 如果自动播放，开始动画
       if (autoPlay) {
-        // 直接在这里开始动画，避免循环依赖
+        const fps = currentResource.config.fps;
+        const frameTime = 1000 / fps;
         animationRef.current.isPlaying = true;
-        animationRef.current.totalFrames = totalFrames;
-
-        const animate = () => {
-          if (!animationRef.current.isPlaying || !spriteRef.current) return;
-
-          const { currentFrame, totalFrames } = animationRef.current;
-
-          // 更新当前帧
-          spriteRef.current.texture = frames[currentFrame];
-
-          // 计算下一帧
-          let nextFrame = currentFrame + 1;
-
-          // 检查是否到达最后一帧
-          if (nextFrame >= totalFrames) {
-            if (loop) {
-              nextFrame = 0; // 循环播放
-            } else {
-              // 单次播放完成
-              animationRef.current.isPlaying = false;
-              onComplete?.();
-              return;
-            }
-          }
-
-          animationRef.current.currentFrame = nextFrame;
-          animationRef.current.animationId = requestAnimationFrame(animate);
-        };
-
-        // 开始动画循环
-        const frameInterval = 1000 / currentResource.config.fps;
         animationRef.current.timeoutId = setTimeout(() => {
-          animationRef.current.animationId = requestAnimationFrame(animate);
-        }, frameInterval);
+          animateWithRef(frames, totalFrames, fps);
+        }, frameTime);
       }
     } catch (error) {
       console.error("Failed to create animated sprite:", error);
     }
-  }, [
-    currentResource,
-    containerSize.width,
-    containerSize.height,
-    autoPlay,
-    loop,
-    currentResource,
-    onComplete,
-  ]);
+  }, [containerSize.width, containerSize.height, currentResource]);
 
   // 开始动画
   const startAnimation = useCallback(() => {
     if (!spriteRef.current || !currentResource) return;
 
-    const { frames } = currentResource;
-    const totalFrames = frames.length;
-
+    const totalFrames = spriteRef.current.textures.length;
     if (totalFrames === 0) return;
+
+    const fps = currentResource.config.fps;
+    const frames = currentResource.frames;
+    const frameTime = 1000 / fps;
+
+    if (animationRef.current.timeoutId) {
+      clearTimeout(animationRef.current.timeoutId);
+    }
 
     animationRef.current.isPlaying = true;
     animationRef.current.totalFrames = totalFrames;
-
-    const animate = () => {
-      if (!animationRef.current.isPlaying || !spriteRef.current) return;
-
-      const { currentFrame, totalFrames } = animationRef.current;
-
-      // 更新当前帧
-      spriteRef.current.texture = frames[currentFrame];
-
-      // 计算下一帧
-      let nextFrame = currentFrame + 1;
-
-      // 检查是否到达最后一帧
-      if (nextFrame >= totalFrames) {
-        if (loop) {
-          nextFrame = 0; // 循环播放
-        } else {
-          // 单次播放完成
-          animationRef.current.isPlaying = false;
-          onComplete?.();
-          return;
-        }
-      }
-
-      animationRef.current.currentFrame = nextFrame;
-      animationRef.current.animationId = requestAnimationFrame(animate);
-    };
-
-    // 开始动画循环
-    const frameInterval = 1000 / currentResource.config.fps;
     animationRef.current.timeoutId = setTimeout(() => {
-      animationRef.current.animationId = requestAnimationFrame(animate);
-    }, frameInterval);
-  }, [currentResource, loop, onComplete]);
+      animateWithRef(frames, totalFrames, fps);
+    }, frameTime);
+  }, [currentResource]);
 
   // 停止动画
   const stopAnimation = useCallback(() => {
     animationRef.current.isPlaying = false;
-    if (animationRef.current.animationId) {
-      cancelAnimationFrame(animationRef.current.animationId);
-      animationRef.current.animationId = undefined;
-    }
     if (animationRef.current.timeoutId) {
       clearTimeout(animationRef.current.timeoutId);
       animationRef.current.timeoutId = undefined;
@@ -270,61 +298,27 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
   const resetAnimation = useCallback(() => {
     stopAnimation();
     animationRef.current.currentFrame = 0;
-    if (spriteRef.current && currentResource) {
-      spriteRef.current.texture = currentResource.frames[0];
+    if (spriteRef.current && currentResourceRef.current) {
+      spriteRef.current.texture = currentResourceRef.current.frames[0];
     }
-  }, [stopAnimation, currentResource]);
-
-  // 切换动画状态
-  const changeState = useCallback(
-    (newState: InternalAnimationState) => {
-      if (newState !== currentState) {
-        onStateChange?.(newState);
-      }
-    },
-    [currentState, onStateChange]
-  );
-
-  // 组件挂载状态管理
-  useEffect(() => {
-    setIsMounted(true);
-    return () => {
-      setIsMounted(false);
-    };
-  }, []);
-
-  // 监听 canvas 元素挂载
-  useEffect(() => {
-    if (
-      canvasRef.current &&
-      isMounted &&
-      containerSize.width > 0 &&
-      containerSize.height > 0
-    ) {
-      // 使用 setTimeout 确保 canvas 完全渲染
-      setTimeout(() => {
-        initializePixi();
-      }, 100);
-    }
-  }, [
-    canvasRef.current,
-    isMounted,
-    containerSize.width,
-    containerSize.height,
-    initializePixi,
-  ]);
+  }, [stopAnimation]);
 
   // 初始化 PIXI 应用
   useEffect(() => {
     if (
+      canvasRef.current &&
       containerSize.width > 0 &&
       containerSize.height > 0 &&
-      isMounted &&
-      canvasRef.current
+      mountedRef.current
     ) {
       initializePixi();
     }
-  }, [initializePixi, containerSize.width, containerSize.height, isMounted]);
+  }, [
+    canvasRef.current,
+    containerSize.width,
+    containerSize.height,
+    initializePixi,
+  ]);
 
   // 当容器尺寸变化时，重新调整 PIXI 应用
   useEffect(() => {
@@ -350,7 +344,12 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 清理资源
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
+      if (animationRef.current.timeoutId) {
+        clearTimeout(animationRef.current.timeoutId);
+      }
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;
@@ -358,19 +357,18 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     };
   }, []);
 
-  // 当资源加载完成时创建动画精灵
+  // 当资源加载完成或状态改变时创建/更新动画精灵
   useEffect(() => {
     if (isInitialized && currentResource && !loading) {
       createAnimatedSprite();
     }
-  }, [isInitialized, currentResource, loading, createAnimatedSprite]);
-
-  // 当状态改变时重新创建动画
-  useEffect(() => {
-    if (currentResource && isInitialized) {
-      createAnimatedSprite();
-    }
-  }, [currentState, createAnimatedSprite, currentResource, isInitialized]);
+  }, [
+    isInitialized,
+    currentResource,
+    loading,
+    createAnimatedSprite,
+    currentState,
+  ]);
 
   // 暴露控制方法
   const controls = useMemo(
@@ -378,9 +376,8 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       play: startAnimation,
       pause: stopAnimation,
       reset: resetAnimation,
-      changeState,
     }),
-    [startAnimation, stopAnimation, resetAnimation, changeState]
+    [startAnimation, stopAnimation, resetAnimation]
   );
 
   // 将控制方法暴露给父组件（通过 ref）

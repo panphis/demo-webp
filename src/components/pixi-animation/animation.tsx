@@ -1,19 +1,62 @@
 "use client";
 
-import type { FC } from "react";
+import { useState, type FC } from "react";
 import { useRouter } from "next/navigation";
-import { useAnimationResources } from "./resource-cache";
-import { Placeholder } from "./placeholder";
-import AnimationContent from "./animation-content";
+import AnimationContent, { AnimationStatus } from "./animation-content";
+import { cn } from "../../lib/utils";
 
 export const Animation: FC = () => {
-  const { loading, resources } = useAnimationResources();
   const router = useRouter();
-  console.log(loading, resources);
+
+  const [status, setStatus] = useState<AnimationStatus>(
+    AnimationStatus.THINKING
+  );
+
+  const onThinking = () => {
+    setStatus(AnimationStatus.THINKING);
+  };
+
+  const onListening = () => {
+    setStatus(AnimationStatus.LISTENING);
+  };
+
+  const onSpeaking = () => {
+    setStatus(AnimationStatus.SPEAKING);
+  };
+
   return (
     <div className="w-full h-full">
-      <AnimationContent />
-      <div>
+      <AnimationContent status={status} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={onThinking}
+          className={cn(
+            "px-3 py-1 border border-gray-300 rounded-md transition-colors",
+            status === AnimationStatus.THINKING && "bg-gray-300"
+          )}
+        >
+          等待
+        </button>
+
+        <button
+          onClick={onListening}
+          className={cn(
+            "px-3 py-1 border border-gray-300 rounded-md transition-colors",
+            status === AnimationStatus.LISTENING && "bg-gray-300"
+          )}
+        >
+          记录
+        </button>
+
+        <button
+          onClick={onSpeaking}
+          className={cn(
+            "px-3 py-1 border border-gray-300 rounded-md transition-colors",
+            status === AnimationStatus.SPEAKING && "bg-gray-300"
+          )}
+        >
+          对话
+        </button>
         <button onClick={() => router.push("/")}>home</button>
       </div>
     </div>
