@@ -14,9 +14,13 @@ export enum AnimationStatus {
 
 type AnimationContentProps = {
   status: AnimationStatus;
+  className?: string;
 };
 
-export const AnimationContent: FC<AnimationContentProps> = ({ status }) => {
+export const AnimationContent: FC<AnimationContentProps> = ({
+  status,
+  className,
+}) => {
   const [currentState, setCurrentState] = useState<InternalAnimationState>(
     InternalAnimationState.wait
   );
@@ -121,47 +125,13 @@ export const AnimationContent: FC<AnimationContentProps> = ({ status }) => {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col">
-      {/* 动画显示区域 */}
-      <div className="w-96 h-96 rounded-lg overflow-hidden">
-        <AnimationUnit
-          currentState={currentState}
-          autoPlay={true}
-          loop={true}
-          onComplete={handleAnimationComplete}
-        />
-      </div>
-
-      {/* 控制面板 */}
-      <div className="mt-4 p-4 bg-white rounded-lg shadow-sm border">
-        {/* 单个状态控制 */}
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">单个状态</h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.values(InternalAnimationState).map(state => (
-              <button
-                key={state}
-                onClick={() => playState(state)}
-                className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                  currentState === state
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {state.replace(/_/g, " ")}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 播放控制 */}
-        <div className="flex items-center gap-2 flex-wrap text-black">
-          <div className="text-sm text-gray-600">
-            当前状态: <span className="font-medium">{currentState}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AnimationUnit
+      className={className}
+      currentState={currentState}
+      autoPlay={true}
+      loop={true}
+      onComplete={handleAnimationComplete}
+    />
   );
 };
 

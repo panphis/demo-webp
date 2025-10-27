@@ -6,6 +6,7 @@ import { Application, AnimatedSprite, Texture } from "pixi.js";
 import { useAnimationResources } from "./resource-cache";
 import { InternalAnimationState } from "../../types/animation";
 import { Placeholder } from "./placeholder";
+import { cn } from "@/lib/utils";
 
 interface AnimationUnitProps {
   /** 当前动画状态 */
@@ -16,9 +17,12 @@ interface AnimationUnitProps {
   loop?: boolean;
   /** 动画完成回调 */
   onComplete?: () => void;
+  /** 容器类名 */
+  className?: string;
 }
 
 export const AnimationUnit: FC<AnimationUnitProps> = ({
+  className,
   currentState = InternalAnimationState.wait,
   autoPlay = true,
   loop = false,
@@ -391,7 +395,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full"
+      className={cn("relative w-full h-full", className)}
       style={{ minHeight: "200px" }}
     >
       <canvas
@@ -410,7 +414,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       )}
       {!loading && isInitialized && !currentResource && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <div className="text-gray-600">Animation resource not available</div>
+          <Placeholder />
         </div>
       )}
     </div>

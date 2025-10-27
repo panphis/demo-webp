@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimationStatus } from "@/components/pixi-animation/animation-content";
 import dynamic from "next/dynamic";
 
 const NoSSRAnimation = dynamic(
@@ -15,7 +16,7 @@ export default function HomePage() {
       <div className="max-w-4xl mx-auto">
         {/* 动画容器 */}
         <div className="shadow-lg p-6 mb-8">
-          <NoSSRAnimation />
+          <NoSSRAnimation className="w-96 h-96" status={AnimationStatus.THINKING} />
         </div>
       </div>
     </div>
