@@ -256,6 +256,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       // 如果自动播放，开始动画
       if (autoPlay) {
         const fps = currentResource.config.fps;
+        console.log("fps", fps);
         const frameTime = 1000 / fps;
         animationRef.current.isPlaying = true;
         animationRef.current.timeoutId = setTimeout(() => {
@@ -275,6 +276,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     if (totalFrames === 0) return;
 
     const fps = currentResource.config.fps;
+    console.log("fps", fps);
     const frames = currentResource.frames;
     const frameTime = 1000 / fps;
 
