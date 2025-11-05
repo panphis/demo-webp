@@ -15,6 +15,10 @@ export const Placeholder: FC = () => {
   }, []);
 
   return (
-    <Image src={placeholder} alt="placeholder" className="w-full h-full" />
+    <Image
+      src={placeholder}
+      alt="placeholder"
+      className="w-full h-full object-contain"
+    />
   );
 };

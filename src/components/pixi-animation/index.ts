@@ -1,4 +1,3 @@
-export { animationResources } from "./animation-resources";
 export { resourceCacheManager } from "./resource-cache";
 
 export { Animation } from "./animation";

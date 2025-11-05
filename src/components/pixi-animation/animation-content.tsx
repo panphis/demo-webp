@@ -49,8 +49,8 @@ export const AnimationContent: FC<AnimationContentProps> = ({
     // 播放 talking_start 状态
     // talking_start 播放完成之后 查看 status。是否为 speaking，如果是，则播放 talking_repeat 状态， 否则播放 talking_end 状态
     // 等待状态改变成 其他状态的时候 先播放完 talking_end 状态，再切换到其他状态
-
     // 如果是新的状态不是是听的状态 但是动画正在播放 writing_start 或 writing_repeat 状态，则播放 writing_end 状态
+
     if (
       status !== Status.listening &&
       (currentState === InternalAnimationState.writing_start ||

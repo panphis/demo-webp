@@ -65,8 +65,9 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 监听容器尺寸变化
   useEffect(() => {
-    if (!containerRef.current) return;
-
+    if (!containerRef.current) {
+      return;
+    }
     // 使用 ResizeObserver 监听容器尺寸变化
     const resizeObserver = new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -125,9 +126,10 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       frames: Texture[],
       totalFrames: number,
       fps: number,
-      shouldAutoPlay: boolean
+      shouldAutoPlay: boolean,
+      newConfig: { cellWidth: number; cellHeight: number }
     ) => {
-      if (!spriteRef.current) return;
+      if (!spriteRef.current || !appRef.current) return;
 
       // 停止当前动画
       animationRef.current.isPlaying = false;
@@ -139,6 +141,17 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       // 更新动画状态
       animationRef.current.currentFrame = 0;
       animationRef.current.totalFrames = totalFrames;
+
+      // 重新计算缩放以适应新的 cellWidth/cellHeight
+      const scale = Math.min(
+        containerSize.width / newConfig.cellWidth,
+        containerSize.height / newConfig.cellHeight
+      );
+      spriteRef.current.scale.set(scale);
+
+      // 确保 sprite 位置在容器中心
+      spriteRef.current.x = containerSize.width / 2;
+      spriteRef.current.y = containerSize.height / 2;
 
       // 更新 sprite 的第一帧
       spriteRef.current.texture = frames[0];
@@ -152,7 +165,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
         }, frameTime);
       }
     },
-    []
+    [containerSize.width, containerSize.height]
   );
 
   // 动画驱动函数 - 使用 setTimeout 精确控制播放速度
@@ -197,8 +210,10 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
   };
 
   // 创建动画精灵
-  const createAnimatedSprite = useCallback(async () => {
-    if (!appRef.current || !currentResource) return;
+  const createAnimatedSprite = async () => {
+    if (!appRef.current || !currentResource) {
+      return;
+    }
 
     try {
       const { frames } = currentResource;
@@ -214,7 +229,15 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
         appRef.current.stage.children.includes(spriteRef.current)
       ) {
         const fps = currentResource.config.fps;
-        updateSpriteTextures(frames, totalFrames, fps, autoPlay);
+        updateSpriteTextures(
+          frames,
+          totalFrames,
+          fps,
+          autoPlay,
+          currentResource.config
+        );
+        // 更新资源引用
+        currentResourceRef.current = currentResource;
         return;
       }
 
@@ -234,14 +257,17 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
       sprite.y = containerSize.height / 2;
 
       // 缩放以适应容器
+      const { cellWidth, cellHeight } = currentResource.config;
       const scale = Math.min(
-        containerSize.width / 1000,
-        containerSize.height / 1000
+        containerSize.width / cellWidth,
+        containerSize.height / cellHeight
       );
       sprite.scale.set(scale);
 
       appRef.current.stage.addChild(sprite);
       spriteRef.current = sprite;
+      // 更新资源引用
+      currentResourceRef.current = currentResource;
 
       // 更新动画状态
       if (animationRef.current.timeoutId) {
@@ -266,14 +292,18 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     } catch (error) {
       console.error("Failed to create animated sprite:", error);
     }
-  }, [containerSize.width, containerSize.height, currentResource]);
+  };
 
   // 开始动画
-  const startAnimation = useCallback(() => {
-    if (!spriteRef.current || !currentResource) return;
+  const startAnimation = () => {
+    if (!spriteRef.current || !currentResource) {
+      return;
+    }
 
     const totalFrames = spriteRef.current.textures.length;
-    if (totalFrames === 0) return;
+    if (totalFrames === 0) {
+      return;
+    }
 
     const fps = currentResource.config.fps;
     console.log("fps", fps);
@@ -289,7 +319,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
     animationRef.current.timeoutId = setTimeout(() => {
       animateWithRef(frames, totalFrames, fps);
     }, frameTime);
-  }, [currentResource]);
+  };
 
   // 停止动画
   const stopAnimation = useCallback(() => {
@@ -395,11 +425,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 始终渲染 canvas，必要时以占位层覆盖，避免初始化死锁
   return (
-    <div
-      ref={containerRef}
-      className={cn("relative w-full h-full", className)}
-      style={{ minHeight: "200px" }}
-    >
+    <div ref={containerRef} className={cn("relative w-full h-full", className)}>
       <canvas
         ref={canvasRef}
         className="w-full h-full bg-transparent"
@@ -410,7 +436,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
         }}
       />
       {(loading || !isInitialized) && (
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 flex items-center justify-center">
           <Placeholder />
         </div>
       )}

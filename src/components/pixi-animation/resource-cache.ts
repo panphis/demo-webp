@@ -6,8 +6,12 @@
  */
 
 import * as PIXI from "pixi.js";
-import { AnimationConfig, InternalAnimationState } from "../../types/animation";
-import { animationResources } from "./animation-resources";
+import {
+  AnimationConfig,
+  AnimationResources,
+  InternalAnimationState,
+} from "../../types/animation";
+import { animationResourcesLoader } from "./animation-resources";
 import { useEffect, useRef, useState } from "react";
 
 export interface CachedTexture {
@@ -21,10 +25,15 @@ export class ResourceCacheManager {
   public loading: boolean = false;
   private cache = new Map<string, CachedTexture>();
   private listeners = new Set<() => void>();
-  private initialized: boolean = false;
+  private animationResources: AnimationResources | undefined;
 
   private constructor() {
-    // 延迟加载，由调用方或首次订阅触发；也可在构造阶段触发但需幂等
+    this.init();
+  }
+
+  private async init(): Promise<void> {
+    this.animationResources =
+      await animationResourcesLoader.getOptimalResources();
     this.loadResources();
   }
 
@@ -32,19 +41,16 @@ export class ResourceCacheManager {
     // 检查是否在客户端环境
     if (typeof window === "undefined") {
       console.warn("PIXI.js resources cannot be loaded on server side");
-      this.initialized = true;
       this.loading = false;
       this.notify();
       return;
     }
 
-    // 如果已经完成过一次初始化加载，且没有缺失，则直接返回
-    const entries = Object.entries(animationResources) as Array<
+    const entries = Object.entries(this.animationResources! ?? {}) as Array<
       [InternalAnimationState, AnimationConfig]
     >;
     const missing = entries.filter(([state]) => !this.isResourceLoaded(state));
     if (missing.length === 0) {
-      this.initialized = true;
       this.loading = false;
       this.notify();
       return;
@@ -58,7 +64,6 @@ export class ResourceCacheManager {
     });
     await Promise.all(allPromises);
     this.loading = false;
-    this.initialized = true;
     this.notify();
   }
 
@@ -85,8 +90,7 @@ export class ResourceCacheManager {
       return this.cache.get(cacheKey)!;
     }
 
-    // 检查该状态是否有对应的子状态配置
-    const stateConfig = animationResources[state];
+    const stateConfig = this.animationResources![state];
     const result = await this.loadResource(stateConfig);
     this.cache.set(cacheKey, result);
     this.notify();
@@ -189,7 +193,7 @@ export class ResourceCacheManager {
     // 计算实际可用的状态组合数量
     let total = 0;
     Object.values(InternalAnimationState).forEach(mainState => {
-      const stateConfig = animationResources[mainState];
+      const stateConfig = this.animationResources![mainState];
       if (stateConfig) {
         // 每个内部状态对应一个资源配置
         total += 1;
