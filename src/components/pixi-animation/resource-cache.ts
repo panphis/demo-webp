@@ -8,7 +8,7 @@
 import * as PIXI from "pixi.js";
 import { AnimationConfig, InternalAnimationState } from "../../types/animation";
 import { animationResources } from "./animation-resources";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface CachedTexture {
   texture: PIXI.Texture;

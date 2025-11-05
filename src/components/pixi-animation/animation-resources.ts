@@ -20,6 +20,7 @@ import talkingEndImg from "./talking-end-14-10000x10000-1000x1000.webp";
  * 动画资源配置
  * 包含所有动画状态对应的图片资源信息
  */
+
 export const animationResources: AnimationResources = {
   [InternalAnimationState.wait]: {
     width: 15000,

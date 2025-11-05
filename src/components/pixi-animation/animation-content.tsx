@@ -1,19 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { Status } from "@/lib/constants";
+import { InternalAnimationState } from "@/types/animation";
 import type { FC } from "react";
-import { AnimationUnit } from "./animation-unit";
-import { InternalAnimationState } from "../../types/animation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimationController } from "./animation-controller";
-
-export enum AnimationStatus {
-  THINKING = "thinking",
-  LISTENING = "listening",
-  SPEAKING = "speaking",
-}
+import { AnimationUnit } from "./animation-unit";
 
 type AnimationContentProps = {
-  status: AnimationStatus;
+  status: Status;
   className?: string;
 };
 
@@ -57,7 +52,7 @@ export const AnimationContent: FC<AnimationContentProps> = ({
 
     // 如果是新的状态不是是听的状态 但是动画正在播放 writing_start 或 writing_repeat 状态，则播放 writing_end 状态
     if (
-      status !== AnimationStatus.LISTENING &&
+      status !== Status.listening &&
       (currentState === InternalAnimationState.writing_start ||
         currentState === InternalAnimationState.writing_repeat)
     ) {
@@ -67,7 +62,7 @@ export const AnimationContent: FC<AnimationContentProps> = ({
 
     // 如果 新的状态 不是 说的 状态 但动画还没说完
     if (
-      status !== AnimationStatus.SPEAKING &&
+      status !== Status.speaking &&
       (currentState === InternalAnimationState.talk_start ||
         currentState === InternalAnimationState.talk_repeat)
     ) {
@@ -77,7 +72,7 @@ export const AnimationContent: FC<AnimationContentProps> = ({
 
     // 如果还在听的状态，且动画是 writing_start 或 writing_repeat 状态，则播放 writing_start 状态
     if (
-      (status === AnimationStatus.LISTENING &&
+      (status === Status.listening &&
         currentState === InternalAnimationState.writing_start) ||
       currentState === InternalAnimationState.writing_repeat
     ) {
@@ -86,7 +81,7 @@ export const AnimationContent: FC<AnimationContentProps> = ({
     }
 
     if (
-      status === AnimationStatus.SPEAKING &&
+      status === Status.speaking &&
       (currentState === InternalAnimationState.talk_start ||
         currentState === InternalAnimationState.talk_repeat)
     ) {
@@ -96,7 +91,7 @@ export const AnimationContent: FC<AnimationContentProps> = ({
 
     // wait / talk_end => listening
     if (
-      status === AnimationStatus.LISTENING &&
+      status === Status.listening &&
       (currentState === InternalAnimationState.wait ||
         currentState === InternalAnimationState.talk_end)
     ) {
@@ -106,7 +101,7 @@ export const AnimationContent: FC<AnimationContentProps> = ({
 
     // wait / writing_end => speaking
     if (
-      status === AnimationStatus.SPEAKING &&
+      status === Status.speaking &&
       (currentState === InternalAnimationState.wait ||
         currentState === InternalAnimationState.writing_end)
     ) {
