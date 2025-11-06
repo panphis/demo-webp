@@ -18,7 +18,7 @@ export const Placeholder: FC = () => {
     <Image
       src={placeholder}
       alt="placeholder"
-      className="w-full h-full object-contain"
+      className="w-full h-full object-contain bg-transparent"
     />
   );
 };

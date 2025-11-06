@@ -13,10 +13,7 @@ export default function HomePage() {
       <div className="max-w-4xl mx-auto">
         {/* 动画容器 */}
         <div className="shadow-lg p-6 mb-8">
-          <Animation
-            className="w-32 h-32 md:w-64 md:h-64 lg:w-96 lg:h-96"
-            status={status}
-          />
+          <Animation className="w-64 h-64 lg:w-96 lg:h-96" status={status} />
         </div>
         <div className="flex gap-2">
           <Button
