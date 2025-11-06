@@ -37,13 +37,9 @@ export default function HomePage() {
           >
             Speaking
           </Button>
-          <Button
-            variant={status === Status.init ? "default" : "outline"}
-            onClick={() => setStatus(Status.init)}
-          >
-            Init
+          <Button asChild>
+            <Link href="/">Home</Link>
           </Button>
-          <Link href="/">Home</Link>
         </div>
       </div>
     </div>
