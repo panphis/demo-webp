@@ -409,7 +409,7 @@ export class PreloadResourcesManager {
     // 最终回退：选择中等分辨率或最小分辨率
     const fallback =
       textureOptions.find(o => o.width === 4000) ||
-      textureOptions.find(o => o.width === 1000) ||
+      textureOptions.find(o => o.width === 1000) ||   
       textureOptions[textureOptions.length - 1];
     return fallback;
   }
