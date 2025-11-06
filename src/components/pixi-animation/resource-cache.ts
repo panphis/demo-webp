@@ -1,124 +1,123 @@
+"use client";
+
 /**
- * 动画资源缓存管理器
- * 负责预加载和缓存所有动画资源
+ * 简化的动画资源缓存管理器
+ * 专注于按需加载和基本缓存
  */
 
 import * as PIXI from "pixi.js";
-import { AnimationConfig, InternalAnimationState, AnimationSubState } from "../../types/animation";
-import { animationResources } from "./animation-resources";
+import {
+  AnimationConfig,
+  AnimationResources,
+  InternalAnimationState,
+} from "../../types/animation";
+import { animationResourcesLoader } from "./animation-resources";
+import { useEffect, useRef, useState } from "react";
 
-interface CachedTexture {
+export interface CachedTexture {
   texture: PIXI.Texture;
   frames: PIXI.Texture[];
   config: AnimationConfig;
 }
 
-class ResourceCacheManager {
+export class ResourceCacheManager {
   private static instance: ResourceCacheManager;
+  public loading: boolean = false;
   private cache = new Map<string, CachedTexture>();
-  private loadingPromises = new Map<string, Promise<CachedTexture>>();
-  private isPreloading = false;
+  private listeners = new Set<() => void>();
+  private animationResources: AnimationResources | undefined;
 
-  private constructor() {}
-
-  static getInstance(): ResourceCacheManager {
-    if (!ResourceCacheManager.instance) {
-      ResourceCacheManager.instance = new ResourceCacheManager();
-    }
-    return ResourceCacheManager.instance;
+  private constructor() {
+    this.init();
   }
 
-  /**
-   * 预加载所有动画资源
-   */
-  async preloadAllResources(): Promise<void> {
-    if (this.isPreloading) {
+  private async init(): Promise<void> {
+    this.animationResources =
+      await animationResourcesLoader.getOptimalResources();
+    this.loadResources();
+  }
+
+  private async loadResources(): Promise<void> {
+    // 检查是否在客户端环境
+    if (typeof window === "undefined") {
+      console.warn("PIXI.js resources cannot be loaded on server side");
+      this.loading = false;
+      this.notify();
       return;
     }
 
-    this.isPreloading = true;
-    console.log("[ResourceCache] 开始预加载所有动画资源...");
-
-    const loadPromises: Promise<void>[] = [];
-
-    // 遍历所有状态和子状态
-    Object.values(InternalAnimationState).forEach(mainState => {
-      Object.values(AnimationSubState).forEach(subState => {
-        const config = animationResources[mainState][subState];
-        const cacheKey = this.getCacheKey(mainState, subState);
-        
-        if (!this.cache.has(cacheKey)) {
-          loadPromises.push(
-            this.loadResource(mainState, subState, config).then(() => {
-              console.log(`[ResourceCache] 已加载: ${mainState}-${subState}`);
-            })
-          );
-        }
-      });
-    });
-
-    try {
-      await Promise.all(loadPromises);
-      console.log("[ResourceCache] 所有资源预加载完成");
-    } catch (error) {
-      console.error("[ResourceCache] 预加载失败:", error);
-    } finally {
-      this.isPreloading = false;
+    const entries = Object.entries(this.animationResources! ?? {}) as Array<
+      [InternalAnimationState, AnimationConfig]
+    >;
+    const missing = entries.filter(([state]) => !this.isResourceLoaded(state));
+    if (missing.length === 0) {
+      this.loading = false;
+      this.notify();
+      return;
     }
+
+    this.loading = true;
+    const allPromises = missing.map(async ([state, cfg]) => {
+      const result = await this.loadResource(cfg);
+      const cacheKey = this.getCacheKey(state);
+      this.cache.set(cacheKey, result);
+    });
+    await Promise.all(allPromises);
+    this.loading = false;
+    this.notify();
+  }
+
+  static getInstance(): ResourceCacheManager {
+    // 将单例提升到 globalThis，避免 HMR/路由切换重新实例化
+    const g = globalThis as unknown as {
+      __pixiResourceManager?: ResourceCacheManager;
+    };
+    if (!g.__pixiResourceManager) {
+      g.__pixiResourceManager = new ResourceCacheManager();
+    }
+    ResourceCacheManager.instance = g.__pixiResourceManager;
+    return g.__pixiResourceManager;
   }
 
   /**
    * 获取缓存的资源
    */
-  async getResource(mainState: InternalAnimationState, subState: AnimationSubState): Promise<CachedTexture> {
-    const cacheKey = this.getCacheKey(mainState, subState);
-    
+  async getResource(state: InternalAnimationState): Promise<CachedTexture> {
+    const cacheKey = this.getCacheKey(state);
+
     // 如果已缓存，直接返回
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey)!;
     }
 
-    // 如果正在加载，等待加载完成
-    if (this.loadingPromises.has(cacheKey)) {
-      return this.loadingPromises.get(cacheKey)!;
-    }
+    const stateConfig = this.animationResources![state];
+    const result = await this.loadResource(stateConfig);
+    this.cache.set(cacheKey, result);
+    this.notify();
 
-    // 开始加载
-    const config = animationResources[mainState][subState];
-    return this.loadResource(mainState, subState, config);
+    return result;
   }
 
   /**
    * 加载单个资源
    */
-  private async loadResource(
-    mainState: InternalAnimationState, 
-    subState: AnimationSubState, 
-    config: AnimationConfig
-  ): Promise<CachedTexture> {
-    const cacheKey = this.getCacheKey(mainState, subState);
-
-    const loadPromise = this._loadResourceInternal(config);
-    this.loadingPromises.set(cacheKey, loadPromise);
-
-    try {
-      const result = await loadPromise;
-      this.cache.set(cacheKey, result);
-      this.loadingPromises.delete(cacheKey);
-      return result;
-    } catch (error) {
-      this.loadingPromises.delete(cacheKey);
-      throw error;
+  private async loadResource(config: AnimationConfig): Promise<CachedTexture> {
+    // 检查是否在客户端环境
+    if (typeof window === "undefined") {
+      throw new Error("PIXI.js resources cannot be loaded on server side");
     }
-  }
 
-  /**
-   * 内部加载实现
-   */
-  private async _loadResourceInternal(config: AnimationConfig): Promise<CachedTexture> {
-    // 加载纹理
-    const texture = await PIXI.Assets.load(config.imgSrc);
-    
+    // 先尝试复用 PIXI.Assets 的缓存，避免重复网络请求
+    let texture = PIXI.Assets.get(config.imgSrc) as PIXI.Texture | undefined;
+    if (!texture) {
+      // 确保已注册资源键，使用稳定 key（imgSrc 本身）
+      try {
+        // add 如果重复会抛错，包在 try 捕获即可
+        PIXI.Assets.add({ alias: config.imgSrc, src: config.imgSrc });
+      } catch {}
+      texture = (await PIXI.Assets.load(config.imgSrc)) as PIXI.Texture;
+    }
+
     if (texture.source && "scaleMode" in texture.source) {
       texture.source.scaleMode = "nearest";
     }
@@ -148,34 +147,62 @@ class ResourceCacheManager {
     return {
       texture,
       frames,
-      config
+      config,
     };
   }
 
   /**
    * 获取缓存键
    */
-  private getCacheKey(mainState: InternalAnimationState, subState: AnimationSubState): string {
-    return `${mainState}-${subState}`;
+  private getCacheKey(mainState: InternalAnimationState): string {
+    return `${mainState}`;
+  }
+
+  /**
+   * 订阅内部状态变化（loading、cache 变更）
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    // 首次订阅时触发一次幂等加载，避免路由切换后不必要重复加载
+    void this.loadResources();
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    this.listeners.forEach(l => {
+      try {
+        l();
+      } catch {}
+    });
   }
 
   /**
    * 检查资源是否已加载
    */
-  isResourceLoaded(mainState: InternalAnimationState, subState: AnimationSubState): boolean {
-    const cacheKey = this.getCacheKey(mainState, subState);
+  isResourceLoaded(mainState: InternalAnimationState): boolean {
+    const cacheKey = this.getCacheKey(mainState);
     return this.cache.has(cacheKey);
   }
 
   /**
    * 获取缓存统计信息
    */
-  getCacheStats(): { loaded: number; total: number; loading: number } {
-    const total = Object.keys(InternalAnimationState).length * Object.keys(AnimationSubState).length;
+  getCacheStats(): { loaded: number; total: number } {
+    // 计算实际可用的状态组合数量
+    let total = 0;
+    Object.values(InternalAnimationState).forEach(mainState => {
+      const stateConfig = this.animationResources![mainState];
+      if (stateConfig) {
+        // 每个内部状态对应一个资源配置
+        total += 1;
+      }
+    });
+
     const loaded = this.cache.size;
-    const loading = this.loadingPromises.size;
-    
-    return { loaded, total, loading };
+
+    return { loaded, total };
   }
 
   /**
@@ -187,11 +214,60 @@ class ResourceCacheManager {
       cached.texture.destroy();
       cached.frames.forEach(frame => frame.destroy());
     });
-    
+
     this.cache.clear();
-    this.loadingPromises.clear();
-    this.isPreloading = false;
+    this.notify();
+  }
+
+  /**
+   * 获取指定状态已缓存的资源（未加载返回 undefined）
+   */
+  getCached(mainState: InternalAnimationState): CachedTexture | undefined {
+    return this.cache.get(this.getCacheKey(mainState));
+  }
+
+  /**
+   * 获取所有内部状态的缓存映射（Partial Record）
+   */
+  getAllCached(): Partial<Record<InternalAnimationState, CachedTexture>> {
+    const result: Partial<Record<InternalAnimationState, CachedTexture>> = {};
+    Object.values(InternalAnimationState).forEach(state => {
+      const cached = this.getCached(state);
+      if (cached) {
+        result[state] = cached;
+      }
+    });
+    return result;
   }
 }
 
 export const resourceCacheManager = ResourceCacheManager.getInstance();
+
+/**
+ * React Hook：返回加载状态与转换后的资源映射
+ * - loading: 是否仍在预加载资源
+ * - resources: Partial<Record<InternalAnimationState, CachedTexture>>
+ */
+export function useAnimationResources() {
+  const managerRef = useRef(resourceCacheManager);
+
+  const [loading, setLoading] = useState<boolean>(managerRef.current.loading);
+  const [resources, setResources] = useState<
+    Partial<Record<InternalAnimationState, CachedTexture>>
+  >(() => managerRef.current.getAllCached());
+
+  useEffect(() => {
+    const unsubscribe = managerRef.current.subscribe(() => {
+      setLoading(managerRef.current.loading);
+      setResources(managerRef.current.getAllCached());
+    });
+    // 初始化同步一次，避免错过首次变化
+    setLoading(managerRef.current.loading);
+    const resources = managerRef.current.getAllCached();
+    console.log(resources);
+    setResources(resources);
+    return unsubscribe;
+  }, []);
+
+  return { loading, resources };
+}

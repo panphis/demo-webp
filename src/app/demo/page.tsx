@@ -1,23 +1,45 @@
-import Link from "next/link";
+"use client";
 
-export default function DemoPage() {
+import Link from "next/link";
+import { Status } from "@/lib/constants";
+import { Animation } from "@/components/pixi-animation/animation";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+export default function HomePage() {
+  const [status, setStatus] = useState(Status.thinking);
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-screen">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8">
-          动画演示页面
-        </h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Link 
-            href="/demo/sequence-animation"
-            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
+        {/* 动画容器 */}
+        <div className="shadow-lg p-6 mb-8">
+          <Animation
+            className="w-32 h-32 md:w-64 md:h-64 lg:w-96 lg:h-96"
+            status={status}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={status === Status.thinking ? "default" : "outline"}
+            onClick={() => setStatus(Status.thinking)}
           >
-            <h2 className="text-xl font-semibold mb-2">动画序列播放</h2>
-            <p className="text-gray-600">
-              演示多个动画的连续播放，支持状态切换和循环播放
-            </p>
-          </Link>
+            Thinking
+          </Button>
+          <Button
+            variant={status === Status.listening ? "default" : "outline"}
+            onClick={() => setStatus(Status.listening)}
+          >
+            Listening
+          </Button>
+          <Button
+            variant={status === Status.speaking ? "default" : "outline"}
+            onClick={() => setStatus(Status.speaking)}
+          >
+            Speaking
+          </Button>
+          <Button asChild>
+            <Link href="/">Home</Link>
+          </Button>
         </div>
       </div>
     </div>

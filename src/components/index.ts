@@ -1,3 +1,3 @@
 export { LoadingButton } from "./animation";
 
-export { PixiAnimation, PixiWait } from "./pixi-animation";
+export { Animation } from "./pixi-animation";
