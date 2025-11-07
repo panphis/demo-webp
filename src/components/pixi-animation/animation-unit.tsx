@@ -436,12 +436,9 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
           display: "block",
         }}
       />
-      {(loading || !isInitialized) && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Placeholder />
-        </div>
-      )}
-      {!loading && isInitialized && !currentResource && (
+      {(loading ||
+        !isInitialized ||
+        (!loading && isInitialized && !currentResource)) && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Placeholder />
         </div>
