@@ -286,8 +286,17 @@ export class PreloadResourcesManager {
    * 检测是否为 iOS 设备
    */
   private isIOS(): boolean {
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    return /iP(hone|ad|od)/.test(ua);
+    const ua = navigator.userAgent.toLowerCase();
+
+    // iPhone / iPod / iPad (iOS 12及以下)
+    if (/iphone|ipod|ipad/.test(ua)) return true;
+
+    // iPadOS 13+ (Safari 伪装成 macOS)
+    if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
