@@ -60,6 +60,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
 
   // 获取当前状态的资源
   const currentResource = useMemo(() => {
+    console.log("resources", resources);
     return resources[currentState];
   }, [resources, currentState]);
 
@@ -441,7 +442,7 @@ export const AnimationUnit: FC<AnimationUnitProps> = ({
         </div>
       )}
       {!loading && isInitialized && !currentResource && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+        <div className="absolute inset-0 flex items-center justify-center">
           <Placeholder />
         </div>
       )}
