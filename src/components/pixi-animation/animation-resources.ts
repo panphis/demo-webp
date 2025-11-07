@@ -9,15 +9,15 @@ import {
 } from "../../types/animation";
 
 // 导入动画资源图片
-import waitImg from "./wait-122-15000x15000-1000x1000.webp";
-import writingStartImg from "./writing-start-13-10000x10000-1000x1000.webp";
-import writingRepeatImg from "./writing-repeat-49-10000x10000-1000x1000.webp";
-import writingEndImg from "./writing-end-15-10000x10000-1000x1000.webp";
-import talkingStartImg from "./talking-start-11-10000x10000-1000x1000.webp";
-import talkingRepeatImg from "./talking-repeat-27-10000x10000-1000x1000.webp";
-import talkingEndImg from "./talking-end-14-10000x10000-1000x1000.webp";
+import waitImg from "./png/standing-repeat-55-10000x10000-1000x1000.webp";
+import writingStartImg from "./png/writing-start-13-10000x10000-1000x1000.webp";
+import writingRepeatImg from "./png/writing-repeat-49-10000x10000-1000x1000.webp";
+import writingEndImg from "./png/writing-end-15-10000x10000-1000x1000.webp";
+import talkingStartImg from "./png/talking-start-11-10000x10000-1000x1000.webp";
+import talkingRepeatImg from "./png/talking-repeat-27-10000x10000-1000x1000.webp";
+import talkingEndImg from "./png/talking-end-14-10000x10000-1000x1000.webp";
 
-import waitImgMD from "./png/wait-122-4096-4096-273x273.png";
+import waitImgMD from "./png/standing-repeat-55-4000x2400-400x400.webp";
 import writingStartImgMD from "./png/writing-start-13-4000x4000-400x400.png";
 import writingRepeatImgMD from "./png/writing-repeat-49-4000x4000-400x400.png";
 import writingEndImgMD from "./png/writing-end-15-4000x4000-400x400.png";
@@ -25,7 +25,7 @@ import talkingStartImgMD from "./png/talking-start-11-4000x4000-400x400.png";
 import talkingRepeatImgMD from "./png/talking-repeat-27-4000x4000-400x400.png";
 import talkingEndImgMD from "./png/talking-end-14-4000x4000-400x400.png";
 
-import waitImgSM from "./png/wait-122-1024x1024-68x68.png";
+import waitImgSM from "./png/standing-repeat-55-1000x1000-100x100.png";
 import writingStartImgSM from "./png/writing-start-13-1000x1000-100x100.png";
 import writingRepeatImgSM from "./png/writing-repeat-49-1000x1000-100x100.png";
 import writingEndImgSM from "./png/writing-end-15-1000x1000-100x100.png";
@@ -217,30 +217,30 @@ const talkingEndUrls: AnimationConfig[] = [
 
 const WaitUrls: AnimationConfig[] = [
   {
-    width: 15000,
-    height: 15000,
+    width: 10000,
+    height: 10000,
     cellWidth: 1000,
     cellHeight: 1000,
     imgSrc: waitImg.src,
-    count: 122,
+    count: 55,
     fps: 48,
   },
   {
-    width: 4096,
-    height: 4096,
-    cellWidth: 273,
-    cellHeight: 273,
+    width: 4000,
+    height: 4000,
+    cellWidth: 400,
+    cellHeight: 400,
     imgSrc: waitImgMD.src,
-    count: 122,
+    count: 55,
     fps: 48,
   },
   {
-    width: 1024,
-    height: 1024,
-    cellWidth: 68,
-    cellHeight: 68,
+    width: 1000,
+    height: 1000,
+    cellWidth: 100,
+    cellHeight: 100,
     imgSrc: waitImgSM.src,
-    count: 122,
+    count: 55,
     fps: 48,
   },
 ];
@@ -409,7 +409,7 @@ export class PreloadResourcesManager {
     // 最终回退：选择中等分辨率或最小分辨率
     const fallback =
       textureOptions.find(o => o.width === 4000) ||
-      textureOptions.find(o => o.width === 1000) ||   
+      textureOptions.find(o => o.width === 1000) ||
       textureOptions[textureOptions.length - 1];
     return fallback;
   }
